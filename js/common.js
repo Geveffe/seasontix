@@ -109,9 +109,10 @@ export function showConfirm(message, confirmLabel = 'Confirm') {
   });
 }
 
-// ---- Seat fill percentage ---------------------------------------
+// ---- Ticket set definitions ------------------------------------
 
-export function getSeatPct(available, total) {
-  if (!total) return 0;
-  return Math.round(((total - available) / total) * 100);
-}
+export const TICKET_SETS = {
+  s149bb1213: 'Sec 149 · Row BB · Seats 12–13',
+  s149bb1415: 'Sec 149 · Row BB · Seats 14–15',
+  s130m57:    'Sec 130 · Row M · Seats 5–7',
+};

@@ -83,25 +83,13 @@
         <button class="modal-close" onclick="closeClaimModal()">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:15px;font-weight:600;margin-bottom:4px" id="claimEventTitle"></p>
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">
-          <span id="claimSeatsMax"></span> seats available
-        </p>
-
+        <p style="font-size:15px;font-weight:600;margin-bottom:16px" id="claimEventTitle"></p>
         <div class="form-group">
-          <label>Number of Seats</label>
-          <div class="seat-selector">
-            <button class="seat-btn" onclick="adjustSeats(-1)">−</button>
-            <input type="number" id="claimSeats" value="1" min="1" max="6" readonly>
-            <button class="seat-btn" onclick="adjustSeats(1)">+</button>
+          <label>Select Ticket Sets</label>
+          <div id="claimSetsContainer" style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
+            <!-- Populated by JS -->
           </div>
         </div>
-
-        <div class="form-group">
-          <label for="claimNotes">Notes (optional)</label>
-          <input type="text" id="claimNotes" placeholder="e.g. bringing a guest">
-        </div>
-
         <div id="claimError" class="error-msg hidden"></div>
       </div>
       <div class="modal-footer">

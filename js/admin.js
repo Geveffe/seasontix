@@ -8,7 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
   requireAdmin, formatDate, formatDateShort,
-  showToast, showConfirm, escapeHtml, getSeatPct,
+  showToast, showConfirm, escapeHtml, TICKET_SETS,
 } from './common.js';
 
 let currentUser    = null;
@@ -46,11 +46,11 @@ function setupTabs() {
 // ---- Stats ------------------------------------------------------
 function loadStats() {
   onSnapshot(collection(db, 'events'), (snap) => {
-    const events    = snap.docs.map(d => d.data());
-    const totalEvt  = events.length;
-    const totalSeats = events.reduce((s, e) => s + (e.availableSeats || 0), 0);
-    document.getElementById('statEvents').textContent    = totalEvt;
-    document.getElementById('statAvailSeats').textContent = totalSeats;
+    const events = snap.docs.map(d => d.data());
+    let availSets = 0;
+    events.forEach(e => Object.values(e.ticketSets || {}).forEach(s => { if (s.available) availSets++; }));
+    document.getElementById('statEvents').textContent     = events.length;
+    document.getElementById('statAvailSeats').textContent = availSets;
   });
   onSnapshot(collection(db, 'users'), (snap) => {
     const users   = snap.docs.map(d => d.data());
@@ -90,25 +90,19 @@ function loadEvents() {
 }
 
 function buildEventRow(id, ev) {
-  const tr        = document.createElement('tr');
-  const avail     = ev.availableSeats ?? 0;
-  const total     = ev.totalSeats     ?? 0;
-  const pct       = getSeatPct(avail, total);
-  const isFull    = avail <= 0;
+  const tr = document.createElement('tr');
+  const setsHtml = Object.entries(TICKET_SETS).map(([key, label]) => {
+    const avail = ev.ticketSets?.[key]?.available;
+    const short = label.split('·').pop().trim();   // "Seats 12–13" etc.
+    return `<span class="badge ${avail ? 'badge-available' : 'badge-full'}" style="margin:2px">${escapeHtml(short)}</span>`;
+  }).join('');
+  const priceHtml = ev.price ? `$${Number(ev.price).toFixed(2)}` : '—';
   tr.innerHTML = `
-    <td><strong>${escapeHtml(ev.title)}</strong></td>
+    <td><strong>vs. ${escapeHtml(ev.title)}</strong></td>
     <td>${formatDate(ev.date)}</td>
-    <td>${escapeHtml(ev.venue || '—')}</td>
-    <td>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span>${avail} / ${total}</span>
-        <div class="seats-bar" style="width:60px">
-          <div class="seats-fill ${isFull ? 'full' : ''}" style="width:${pct}%"></div>
-        </div>
-      </div>
-    </td>
+    <td><div style="display:flex;flex-wrap:wrap">${setsHtml}</div></td>
+    <td>${priceHtml}</td>
     <td>${ev.deadline ? formatDateShort(ev.deadline) : '—'}</td>
-    <td>${escapeHtml(ev.notes || '—')}</td>
     <td>
       <div style="display:flex;gap:6px">
         <button class="btn btn-outline btn-sm" onclick="openEditEventModal('${id}')">Edit</button>
@@ -134,20 +128,14 @@ window.openEditEventModal = async function(id) {
   const ev = snap.data();
 
   document.getElementById('eventModalTitle').textContent = 'Edit Event';
-  document.getElementById('evTitle').value      = ev.title || '';
-  document.getElementById('evVenue').value      = ev.venue || '';
-  document.getElementById('evTotalSeats').value = ev.totalSeats || '';
-  document.getElementById('evAvailSeats').value = ev.availableSeats ?? '';
-  document.getElementById('evNotes').value      = ev.notes || '';
+  document.getElementById('evTitle').value    = ev.title || '';
+  document.getElementById('evPrice').value    = ev.price != null ? ev.price : '';
+  document.getElementById('evDate').value     = ev.date     ? toDatetimeLocal(ev.date.toDate())     : '';
+  document.getElementById('evDeadline').value = ev.deadline ? toDatetimeLocal(ev.deadline.toDate()) : '';
 
-  if (ev.date) {
-    document.getElementById('evDate').value = toDatetimeLocal(ev.date.toDate());
-  }
-  if (ev.deadline) {
-    document.getElementById('evDeadline').value = toDatetimeLocal(ev.deadline.toDate());
-  } else {
-    document.getElementById('evDeadline').value = '';
-  }
+  Object.keys(TICKET_SETS).forEach(key => {
+    document.getElementById(`set_${key}`).checked = ev.ticketSets?.[key]?.available ?? false;
+  });
 
   document.getElementById('eventError').classList.add('hidden');
   document.getElementById('eventModal').classList.remove('hidden');
@@ -162,35 +150,25 @@ document.getElementById('eventModal').addEventListener('click', (e) => {
   if (e.target.id === 'eventModal') window.closeEventModal();
 });
 
-// Auto-fill available seats when total changes (add mode only)
-document.getElementById('evTotalSeats').addEventListener('input', () => {
-  if (!editingEventId) {
-    document.getElementById('evAvailSeats').value = document.getElementById('evTotalSeats').value;
-  }
-});
-
 window.submitEvent = async function() {
   const errEl = document.getElementById('eventError');
   errEl.classList.add('hidden');
 
-  const title      = document.getElementById('evTitle').value.trim();
-  const dateStr    = document.getElementById('evDate').value;
-  const venue      = document.getElementById('evVenue').value.trim();
-  const totalSeats = parseInt(document.getElementById('evTotalSeats').value);
-  const availSeats = parseInt(document.getElementById('evAvailSeats').value);
+  const title       = document.getElementById('evTitle').value.trim();
+  const dateStr     = document.getElementById('evDate').value;
   const deadlineStr = document.getElementById('evDeadline').value;
-  const notes      = document.getElementById('evNotes').value.trim();
+  const priceVal    = parseFloat(document.getElementById('evPrice').value);
 
-  if (!title || !dateStr || isNaN(totalSeats) || isNaN(availSeats)) {
-    errEl.textContent = 'Title, date, and seat counts are required.';
+  if (!title || !dateStr) {
+    errEl.textContent = 'Opponent and date are required.';
     errEl.classList.remove('hidden');
     return;
   }
-  if (availSeats > totalSeats) {
-    errEl.textContent = 'Available seats cannot exceed total seats.';
-    errEl.classList.remove('hidden');
-    return;
-  }
+
+  const ticketSets = {};
+  Object.keys(TICKET_SETS).forEach(key => {
+    ticketSets[key] = { available: document.getElementById(`set_${key}`).checked };
+  });
 
   const btn = document.getElementById('submitEvent');
   btn.disabled = true;
@@ -198,13 +176,11 @@ window.submitEvent = async function() {
 
   const data = {
     title,
-    date:           Timestamp.fromDate(new Date(dateStr)),
-    venue,
-    totalSeats,
-    availableSeats: availSeats,
-    notes,
-    deadline:       deadlineStr ? Timestamp.fromDate(new Date(deadlineStr)) : null,
-    updatedAt:      serverTimestamp(),
+    date:       Timestamp.fromDate(new Date(dateStr)),
+    deadline:   deadlineStr ? Timestamp.fromDate(new Date(deadlineStr)) : null,
+    price:      isNaN(priceVal) ? null : priceVal,
+    ticketSets,
+    updatedAt:  serverTimestamp(),
   };
 
   try {
@@ -361,25 +337,25 @@ function loadClaims() {
 function buildClaimRow(c) {
   const tr       = document.createElement('tr');
   const released = c.status === 'released';
+  const setsHtml = (c.sets || []).map(k => escapeHtml(TICKET_SETS[k] || k)).join('<br>');
   tr.innerHTML = `
     <td>${escapeHtml(c.userDisplayName || c.userEmail || '—')}</td>
-    <td>${escapeHtml(c.eventTitle || '—')}</td>
+    <td>vs. ${escapeHtml(c.eventTitle || '—')}</td>
     <td>${c.claimedAt ? formatDateShort(c.claimedAt) : '—'}</td>
-    <td>${c.seatCount}</td>
-    <td>${escapeHtml(c.notes || '—')}</td>
+    <td style="font-size:13px">${setsHtml || '—'}</td>
     <td><span class="badge badge-${released ? 'released' : 'confirmed'}">${released ? 'Released' : 'Confirmed'}</span></td>
     <td>
       ${!released ? `
         <button class="btn btn-ghost btn-sm"
-          onclick="adminCancelClaim('${c.id}', '${c.eventId}', ${c.seatCount}, '${escapeHtml(c.userDisplayName || '')}')">
+          onclick="adminCancelClaim('${c.id}', '${c.eventId}', '${escapeHtml(c.userDisplayName || '')}')">
           Cancel
         </button>` : '—'}
     </td>`;
   return tr;
 }
 
-window.adminCancelClaim = async function(claimId, eventId, seatCount, userName) {
-  const ok = await showConfirm(`Cancel ${userName}'s claim of ${seatCount} seat${seatCount !== 1 ? 's' : ''}? Seats will be returned.`, 'Cancel Claim');
+window.adminCancelClaim = async function(claimId, eventId, userName) {
+  const ok = await showConfirm(`Cancel ${userName}'s claim? Ticket sets will be returned to available.`, 'Cancel Claim');
   if (!ok) return;
 
   try {
@@ -389,12 +365,15 @@ window.adminCancelClaim = async function(claimId, eventId, seatCount, userName) 
       const [claimDoc, eventDoc] = await Promise.all([tx.get(claimRef), tx.get(eventRef)]);
 
       if (!claimDoc.exists()) throw new Error('Claim not found.');
+      const sets = claimDoc.data().sets || [];
       tx.update(claimRef, { status: 'released', releasedAt: serverTimestamp(), releasedByAdmin: true });
-      if (eventDoc.exists()) {
-        tx.update(eventRef, { availableSeats: (eventDoc.data().availableSeats || 0) + seatCount });
+      if (eventDoc.exists() && sets.length > 0) {
+        const updates = {};
+        sets.forEach(s => { updates[`ticketSets.${s}.available`] = true; });
+        tx.update(eventRef, updates);
       }
     });
-    showToast('Claim cancelled and seats returned.', 'success');
+    showToast('Claim cancelled and sets returned.', 'success');
   } catch (err) {
     showToast(err.message || 'Failed to cancel claim.', 'error');
   }

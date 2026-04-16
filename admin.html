@@ -58,7 +58,7 @@
         <div class="stat-value" id="statPending">—</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Seats Available</div>
+        <div class="stat-label">Sets Available</div>
         <div class="stat-value" id="statAvailSeats">—</div>
       </div>
     </div>
@@ -81,17 +81,16 @@
           <table>
             <thead>
               <tr>
-                <th>Title</th>
+                <th>Opponent</th>
                 <th>Date &amp; Time</th>
-                <th>Venue</th>
-                <th>Seats</th>
+                <th>Ticket Sets</th>
+                <th>Price</th>
                 <th>Claim Deadline</th>
-                <th>Notes</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="eventsBody">
-              <tr><td colspan="7" style="text-align:center;padding:32px">
+              <tr><td colspan="6" style="text-align:center;padding:32px">
                 <div class="spinner" style="margin:auto"></div>
               </td></tr>
             </tbody>
@@ -141,14 +140,13 @@
                 <th>Member</th>
                 <th>Event</th>
                 <th>Claimed On</th>
-                <th>Seats</th>
-                <th>Notes</th>
+                <th>Ticket Sets</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="claimsBody">
-              <tr><td colspan="7" style="text-align:center;padding:32px">
+              <tr><td colspan="6" style="text-align:center;padding:32px">
                 <div class="spinner" style="margin:auto"></div>
               </td></tr>
             </tbody>
@@ -170,37 +168,39 @@
         <div id="eventError" class="error-msg hidden"></div>
 
         <form id="eventForm" onsubmit="return false">
-          <div class="form-group">
-            <label for="evTitle">Event Title *</label>
-            <input type="text" id="evTitle" placeholder="Bears vs Packers" required>
-          </div>
           <div class="form-row">
+            <div class="form-group">
+              <label for="evTitle">Opponent *</label>
+              <input type="text" id="evTitle" placeholder="49ers" required>
+            </div>
             <div class="form-group">
               <label for="evDate">Date &amp; Time *</label>
               <input type="datetime-local" id="evDate" required>
             </div>
-            <div class="form-group">
-              <label for="evVenue">Venue</label>
-              <input type="text" id="evVenue" placeholder="Soldier Field">
-            </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label for="evTotalSeats">Total Seats Available *</label>
-              <input type="number" id="evTotalSeats" min="1" placeholder="4" required>
+              <label for="evDeadline">Claim Deadline (optional)</label>
+              <input type="datetime-local" id="evDeadline">
             </div>
             <div class="form-group">
-              <label for="evAvailSeats">Currently Available *</label>
-              <input type="number" id="evAvailSeats" min="0" placeholder="4" required>
+              <label for="evPrice">Price per Set ($, optional)</label>
+              <input type="number" id="evPrice" min="0" step="0.01" placeholder="0.00">
             </div>
           </div>
           <div class="form-group">
-            <label for="evDeadline">Claim Deadline (optional)</label>
-            <input type="datetime-local" id="evDeadline">
-          </div>
-          <div class="form-group">
-            <label for="evNotes">Notes</label>
-            <textarea id="evNotes" placeholder="e.g. Section 114, Row 12 — bring ID"></textarea>
+            <label>Available Ticket Sets</label>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:6px">
+              <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
+                <input type="checkbox" id="set_s149bb1213" checked> Sec 149 · Row BB · Seats 12–13
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
+                <input type="checkbox" id="set_s149bb1415" checked> Sec 149 · Row BB · Seats 14–15
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
+                <input type="checkbox" id="set_s130m57" checked> Sec 130 · Row M · Seats 5–7
+              </label>
+            </div>
           </div>
         </form>
       </div>

@@ -8,12 +8,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
   requireAuth, formatDate, formatDateShort,
-  showToast, showConfirm, escapeHtml, getSeatPct,
+  showToast, showConfirm, escapeHtml, TICKET_SETS,
 } from './common.js';
 
 let currentUser    = null;
 let currentProfile = null;
 let selectedEvent  = null;
+const eventsCache  = {};
 
 requireAuth(async (user, profile) => {
   currentUser    = user;
@@ -65,6 +66,9 @@ function loadEvents() {
 
   onSnapshot(q, (snap) => {
     const now    = new Date();
+    // Keep cache in sync
+    snap.docs.forEach(d => { eventsCache[d.id] = { id: d.id, ...d.data() }; });
+
     const events = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(e => !e.date || e.date.toDate() >= now);
@@ -89,48 +93,47 @@ function loadEvents() {
 }
 
 function buildEventCard(ev) {
-  const card      = document.createElement('div');
-  card.className  = 'event-card';
-  const avail     = ev.availableSeats ?? 0;
-  const total     = ev.totalSeats     ?? 0;
-  const pct       = getSeatPct(avail, total);
-  const isFull    = avail <= 0;
+  const card = document.createElement('div');
+  card.className = 'event-card';
+
+  const anyAvail    = Object.values(ev.ticketSets || {}).some(s => s.available);
   const deadlinePast = ev.deadline && ev.deadline.toDate() < new Date();
+  const canClaim    = anyAvail && !deadlinePast;
+
+  const setsHtml = Object.entries(TICKET_SETS).map(([key, label]) => {
+    const avail = ev.ticketSets?.[key]?.available;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+        <span>${escapeHtml(label)}</span>
+        <span class="badge ${avail ? 'badge-available' : 'badge-full'}" style="margin-left:8px">
+          ${avail ? 'Open' : 'Taken'}
+        </span>
+      </div>`;
+  }).join('');
+
+  const priceHtml = ev.price
+    ? `<div style="font-size:13px;color:var(--text-muted);margin-top:8px">$${Number(ev.price).toFixed(2)} per set</div>`
+    : '';
 
   const deadlineHtml = ev.deadline ? `
-    <div class="deadline ${deadlineClass(ev.deadline)}">
+    <div class="deadline ${deadlineClass(ev.deadline)}" style="margin-top:8px">
       ⏰ Claim by ${formatDateShort(ev.deadline)}
     </div>` : '';
 
   card.innerHTML = `
     <div class="event-card-header">
       <div class="event-date">${formatDate(ev.date)}</div>
-      <div class="event-title">${escapeHtml(ev.title)}</div>
-      <div class="event-venue">${escapeHtml(ev.venue || '')}</div>
+      <div class="event-title">Seahawks vs. ${escapeHtml(ev.title)}</div>
     </div>
     <div class="event-card-body">
-      <div>
-        <div class="seats-info">
-          <div>
-            <div class="seats-count">${avail}</div>
-            <div class="seats-label">of ${total} seats available</div>
-          </div>
-          <span class="badge ${isFull ? 'badge-full' : 'badge-available'}">
-            ${isFull ? 'Full' : 'Open'}
-          </span>
-        </div>
-        <div class="seats-bar" style="margin-top:8px">
-          <div class="seats-fill ${isFull ? 'full' : ''}" style="width:${pct}%"></div>
-        </div>
-      </div>
-      ${ev.notes ? `<div class="event-notes">${escapeHtml(ev.notes)}</div>` : ''}
+      <div style="display:flex;flex-direction:column;gap:6px">${setsHtml}</div>
+      ${priceHtml}
       ${deadlineHtml}
     </div>
     <div class="event-card-footer">
-      <button class="btn btn-primary"
-        ${isFull || deadlinePast ? 'disabled' : ''}
-        onclick="openClaimModal('${escapeHtml(ev.id)}', '${escapeHtml(ev.title)}', ${avail})">
-        ${isFull ? 'No Seats Left' : deadlinePast ? 'Deadline Passed' : 'Claim Seats'}
+      <button class="btn btn-primary" ${canClaim ? '' : 'disabled'}
+        onclick="openClaimModal('${escapeHtml(ev.id)}')">
+        ${!anyAvail ? 'All Sets Taken' : deadlinePast ? 'Deadline Passed' : 'Claim Tickets'}
       </button>
     </div>`;
   return card;
@@ -182,15 +185,15 @@ function loadMyClaims() {
       const released   = claim.status === 'released';
       const eventTitle = claim.event?.title || 'Unknown Event';
 
+      const setsHtml = (claim.sets || [])
+        .map(k => `<div style="font-size:13px;color:var(--text-muted)">${escapeHtml(TICKET_SETS[k] || k)}</div>`)
+        .join('');
+
       item.innerHTML = `
         <div class="claim-info">
-          <div class="claim-title">${escapeHtml(eventTitle)}</div>
-          <div class="claim-meta">
-            ${formatDate(claim.event?.date)}
-            &nbsp;·&nbsp; ${claim.seatCount} seat${claim.seatCount !== 1 ? 's' : ''}
-            ${claim.event?.venue ? ` &nbsp;·&nbsp; ${escapeHtml(claim.event.venue)}` : ''}
-          </div>
-          ${claim.notes ? `<div class="claim-meta" style="margin-top:4px;font-style:italic">"${escapeHtml(claim.notes)}"</div>` : ''}
+          <div class="claim-title">Seahawks vs. ${escapeHtml(eventTitle)}</div>
+          <div class="claim-meta">${formatDate(claim.event?.date)}</div>
+          ${setsHtml}
         </div>
         <div class="claim-actions">
           <span class="badge badge-${released ? 'released' : 'confirmed'}">
@@ -198,7 +201,7 @@ function loadMyClaims() {
           </span>
           ${!released ? `
             <button class="btn btn-ghost btn-sm"
-              onclick="releaseClaim('${claim.id}', '${claim.eventId}', ${claim.seatCount})">
+              onclick="releaseClaim('${claim.id}', '${claim.eventId}')">
               Release
             </button>` : ''}
         </div>`;
@@ -210,28 +213,32 @@ function loadMyClaims() {
 }
 
 // ---- Claim Modal ------------------------------------------------
-window.openClaimModal = function(eventId, title, available) {
-  selectedEvent = { id: eventId, title, available };
-  document.getElementById('claimEventTitle').textContent = title;
-  document.getElementById('claimSeatsMax').textContent   = available;
-  const seatsInput   = document.getElementById('claimSeats');
-  seatsInput.value   = 1;
-  seatsInput.max     = Math.min(available, 6);
-  document.getElementById('claimNotes').value = '';
+window.openClaimModal = function(eventId) {
+  const ev = eventsCache[eventId];
+  if (!ev) return;
+  selectedEvent = ev;
+
+  document.getElementById('claimEventTitle').textContent = `Seahawks vs. ${ev.title}`;
   document.getElementById('claimError').classList.add('hidden');
+
+  const container = document.getElementById('claimSetsContainer');
+  container.innerHTML = Object.entries(TICKET_SETS).map(([key, label]) => {
+    const avail = ev.ticketSets?.[key]?.available;
+    if (!avail) return '';   // don't show already-taken sets
+    return `
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:2px solid var(--border);border-radius:var(--radius-sm);transition:var(--transition)"
+             onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor=this.querySelector('input').checked?'var(--primary)':'var(--border)'">
+        <input type="checkbox" id="claimSet_${key}" value="${key}" style="width:16px;height:16px;cursor:pointer">
+        <span style="font-size:14px">${escapeHtml(label)}</span>
+      </label>`;
+  }).join('');
+
   document.getElementById('claimModal').classList.remove('hidden');
 };
 
 window.closeClaimModal = function() {
   document.getElementById('claimModal').classList.add('hidden');
   selectedEvent = null;
-};
-
-window.adjustSeats = function(delta) {
-  const input = document.getElementById('claimSeats');
-  const next  = parseInt(input.value) + delta;
-  const max   = parseInt(input.max);
-  if (next >= 1 && next <= max) input.value = next;
 };
 
 document.getElementById('claimModal').addEventListener('click', (e) => {
@@ -241,12 +248,12 @@ document.getElementById('claimModal').addEventListener('click', (e) => {
 document.getElementById('submitClaim').addEventListener('click', async () => {
   if (!selectedEvent) return;
 
-  const seatCount = parseInt(document.getElementById('claimSeats').value);
-  const notes     = document.getElementById('claimNotes').value.trim();
-  const errEl     = document.getElementById('claimError');
+  const errEl      = document.getElementById('claimError');
+  const selectedSets = Object.keys(TICKET_SETS)
+    .filter(key => document.getElementById(`claimSet_${key}`)?.checked);
 
-  if (!seatCount || seatCount < 1) {
-    errEl.textContent = 'Please select at least 1 seat.';
+  if (selectedSets.length === 0) {
+    errEl.textContent = 'Please select at least one ticket set.';
     errEl.classList.remove('hidden');
     return;
   }
@@ -261,29 +268,35 @@ document.getElementById('submitClaim').addEventListener('click', async () => {
       const eventDoc = await tx.get(eventRef);
       if (!eventDoc.exists()) throw new Error('Event not found.');
 
-      const avail = eventDoc.data().availableSeats;
-      if (avail < seatCount) throw new Error(`Only ${avail} seat${avail !== 1 ? 's' : ''} left.`);
+      // Verify each requested set is still available
+      const data = eventDoc.data();
+      for (const key of selectedSets) {
+        if (!data.ticketSets?.[key]?.available) {
+          throw new Error(`${TICKET_SETS[key]} was just taken. Please refresh and try again.`);
+        }
+      }
+
+      // Mark sets unavailable
+      const updates = {};
+      selectedSets.forEach(k => { updates[`ticketSets.${k}.available`] = false; });
+      tx.update(eventRef, updates);
 
       // Create the claim
       const claimRef = doc(collection(db, 'claims'));
       tx.set(claimRef, {
-        userId:           currentUser.uid,
-        userEmail:        currentUser.email,
-        userDisplayName:  currentProfile?.displayName || currentUser.email,
-        eventId:          selectedEvent.id,
-        eventTitle:       selectedEvent.title,
-        seatCount,
-        status:           'confirmed',
-        notes,
-        claimedAt:        serverTimestamp(),
+        userId:          currentUser.uid,
+        userEmail:       currentUser.email,
+        userDisplayName: currentProfile?.displayName || currentUser.email,
+        eventId:         selectedEvent.id,
+        eventTitle:      selectedEvent.title,
+        sets:            selectedSets,
+        status:          'confirmed',
+        claimedAt:       serverTimestamp(),
       });
-
-      // Decrement available seats atomically
-      tx.update(eventRef, { availableSeats: avail - seatCount });
     });
 
     window.closeClaimModal();
-    showToast(`${seatCount} seat${seatCount !== 1 ? 's' : ''} claimed! See "My Claims".`, 'success');
+    showToast(`${selectedSets.length} set${selectedSets.length !== 1 ? 's' : ''} claimed! See "My Claims".`, 'success');
   } catch (err) {
     errEl.textContent = err.message || 'Failed to claim. Please try again.';
     errEl.classList.remove('hidden');
@@ -293,10 +306,10 @@ document.getElementById('submitClaim').addEventListener('click', async () => {
 });
 
 // ---- Release ----------------------------------------------------
-window.releaseClaim = async function(claimId, eventId, seatCount) {
+window.releaseClaim = async function(claimId, eventId) {
   const ok = await showConfirm(
-    `Release ${seatCount} seat${seatCount !== 1 ? 's' : ''}? This frees them up for others and cannot be undone.`,
-    'Release Seats'
+    'Release these tickets? They will become available for others and cannot be undone.',
+    'Release Tickets'
   );
   if (!ok) return;
 
@@ -306,14 +319,15 @@ window.releaseClaim = async function(claimId, eventId, seatCount) {
       const eventRef = doc(db, 'events', eventId);
       const [claimDoc, eventDoc] = await Promise.all([tx.get(claimRef), tx.get(eventRef)]);
 
-      if (!claimDoc.exists())                       throw new Error('Claim not found.');
-      if (claimDoc.data().status === 'released')    throw new Error('Already released.');
+      if (!claimDoc.exists())                     throw new Error('Claim not found.');
+      if (claimDoc.data().status === 'released')  throw new Error('Already released.');
 
+      const sets = claimDoc.data().sets || [];
       tx.update(claimRef, { status: 'released', releasedAt: serverTimestamp() });
-      if (eventDoc.exists()) {
-        tx.update(eventRef, {
-          availableSeats: (eventDoc.data().availableSeats || 0) + seatCount,
-        });
+      if (eventDoc.exists() && sets.length > 0) {
+        const updates = {};
+        sets.forEach(s => { updates[`ticketSets.${s}.available`] = true; });
+        tx.update(eventRef, updates);
       }
     });
     showToast('Tickets released successfully.', 'success');
