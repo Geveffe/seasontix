@@ -49,7 +49,7 @@ document.getElementById('googleSetupBtn').addEventListener('click', async () => 
   } catch (err) {
     if (err.code !== 'auth/popup-closed-by-user' &&
         err.code !== 'auth/cancelled-popup-request') {
-      showError('Google sign-in failed. Please try again.');
+      showError(`Google sign-in failed: ${err.code || err.message}`);
     }
     return;
   }

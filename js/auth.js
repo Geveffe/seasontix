@@ -95,7 +95,9 @@ async function handleGoogleSignIn(errorId) {
     // Silently ignore user-dismissed popups
     if (err.code !== 'auth/popup-closed-by-user' &&
         err.code !== 'auth/cancelled-popup-request') {
-      showError(errorId, friendlyError(err.code));
+      showError(errorId, err.code === 'auth/unauthorized-domain'
+        ? `This domain is not authorized in Firebase. Add it under Authentication → Settings → Authorized domains.`
+        : friendlyError(err.code));
     }
   }
 }
