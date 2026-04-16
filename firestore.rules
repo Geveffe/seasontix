@@ -44,7 +44,7 @@ service cloud.firestore {
           (!setupComplete() && request.resource.data.role == 'admin')
         );
 
-      // Users can update their own profile but cannot change their role.
+      // Users can update their own profile but cannot change their role or status.
       // Admins can update any profile field.
       allow update: if isAdmin() ||
         (isAuth() && request.auth.uid == userId &&
@@ -65,14 +65,14 @@ service cloud.firestore {
       allow read: if isAdmin() ||
         (isApproved() && resource.data.userId == request.auth.uid);
 
-      // Users can only create claims for themselves.
-      allow create: if isAuth() &&
+      // Only approved users can create claims for themselves.
+      allow create: if isApproved() &&
         request.resource.data.userId == request.auth.uid;
 
       // Users can only set status to 'released' on their own claims.
       // Admins can do anything.
       allow update: if isAdmin() ||
-        (isAuth() &&
+        (isApproved() &&
          resource.data.userId == request.auth.uid &&
          request.resource.data.status == 'released');
 
