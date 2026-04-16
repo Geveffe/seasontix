@@ -6,12 +6,18 @@ import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// Flag prevents onAuthStateChanged from redirecting mid-Google-flow
+// while we're still writing the new user's Firestore document.
+let googleSignInInProgress = false;
 
 // Already logged in → go to dashboard
 onAuthStateChanged(auth, (user) => {
-  if (user) window.location.href = 'dashboard.html';
+  if (user && !googleSignInInProgress) window.location.href = 'dashboard.html';
 });
 
 // ---- Form toggling ----
@@ -59,8 +65,43 @@ function friendlyError(code) {
     'auth/weak-password':         'Password must be at least 8 characters.',
     'auth/too-many-requests':     'Too many attempts — please try again later.',
     'auth/network-request-failed':'Network error. Check your connection.',
+    'auth/popup-blocked':         'Popup was blocked. Please allow popups for this site.',
+    'auth/account-exists-with-different-credential':
+                                  'An account already exists with this email using a different sign-in method.',
   }[code] || 'Something went wrong. Please try again.';
 }
+
+// ---- Google Sign-In ----
+async function handleGoogleSignIn(errorId) {
+  hideError(errorId);
+  const provider = new GoogleAuthProvider();
+  googleSignInInProgress = true;
+  try {
+    const cred = await signInWithPopup(auth, provider);
+    // Create Firestore profile for first-time Google users
+    const userRef = doc(db, 'users', cred.user.uid);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        email:       cred.user.email,
+        displayName: cred.user.displayName || cred.user.email,
+        role:        'user',
+        createdAt:   serverTimestamp(),
+      });
+    }
+    window.location.href = 'dashboard.html';
+  } catch (err) {
+    googleSignInInProgress = false;
+    // Silently ignore user-dismissed popups
+    if (err.code !== 'auth/popup-closed-by-user' &&
+        err.code !== 'auth/cancelled-popup-request') {
+      showError(errorId, friendlyError(err.code));
+    }
+  }
+}
+
+document.getElementById('googleLoginBtn').addEventListener('click',  () => handleGoogleSignIn('loginError'));
+document.getElementById('googleSignupBtn').addEventListener('click', () => handleGoogleSignIn('signupError'));
 
 // ---- Login ----
 document.getElementById('loginBtn').addEventListener('click', async () => {

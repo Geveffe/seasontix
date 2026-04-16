@@ -36,6 +36,25 @@ body {
    AUTH PAGES (index.html, setup.html)
    ============================================================ */
 
+.btn-google {
+  background: #fff; color: #3c4043;
+  border: 1px solid #dadce0; font-weight: 500;
+}
+.btn-google:hover:not(:disabled) {
+  background: #f8f9fa; border-color: #c6c6c6;
+  box-shadow: var(--shadow);
+}
+
+.auth-divider {
+  display: flex; align-items: center;
+  gap: 12px; margin: 20px 0;
+  color: var(--text-muted); font-size: 13px;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+
 .auth-page {
   display: flex;
   align-items: center;
