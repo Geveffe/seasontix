@@ -41,9 +41,7 @@ function showSuccess(msg) {
 document.getElementById('googleSetupBtn').addEventListener('click', async () => {
   errorMsg.classList.add('hidden');
 
-  const existing = await getDoc(doc(db, 'config', 'setup'));
-  if (existing.exists()) { showError('Setup has already been completed.'); return; }
-
+  // Open the popup immediately — no awaits before this or the browser blocks it.
   const provider = new GoogleAuthProvider();
   let cred;
   try {
@@ -59,6 +57,15 @@ document.getElementById('googleSetupBtn').addEventListener('click', async () => 
   const btn = document.getElementById('googleSetupBtn');
   btn.disabled = true;
   btn.textContent = 'Creating account…';
+
+  // Now safe to do async Firestore checks
+  const existing = await getDoc(doc(db, 'config', 'setup'));
+  if (existing.exists()) {
+    showError('Setup has already been completed.');
+    btn.disabled = false;
+    btn.textContent = 'Create Admin Account with Google';
+    return;
+  }
 
   try {
     const userRef  = doc(db, 'users', cred.user.uid);
