@@ -56,7 +56,12 @@ service cloud.firestore {
     // ---- EVENTS ----
     match /events/{eventId} {
       allow read: if isApproved();
-      allow create, update, delete: if isAdmin();
+      allow create, delete: if isAdmin();
+      // Admins can update anything; approved users can only update ticketSets
+      // (needed for claim/release transactions that mark sets available/unavailable).
+      allow update: if isAdmin() ||
+        (isApproved() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ticketSets']));
     }
 
     // ---- CLAIMS ----
