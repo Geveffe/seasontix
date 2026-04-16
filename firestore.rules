@@ -69,11 +69,12 @@ service cloud.firestore {
       allow create: if isApproved() &&
         request.resource.data.userId == request.auth.uid;
 
-      // Users can only set status to 'released' on their own claims.
+      // Users can release only their own claimed (not transferred) tickets.
       // Admins can do anything.
       allow update: if isAdmin() ||
         (isApproved() &&
          resource.data.userId == request.auth.uid &&
+         resource.data.status == 'claimed' &&
          request.resource.data.status == 'released');
 
       allow delete: if isAdmin();

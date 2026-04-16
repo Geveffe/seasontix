@@ -182,12 +182,15 @@ function loadMyClaims() {
     claims.forEach(claim => {
       const item       = document.createElement('div');
       item.className   = 'claim-item';
-      const released   = claim.status === 'released';
+      const { status } = claim;
       const eventTitle = claim.event?.title || 'Unknown Event';
 
       const setsHtml = (claim.sets || [])
         .map(k => `<div style="font-size:13px;color:var(--text-muted)">${escapeHtml(TICKET_SETS[k] || k)}</div>`)
         .join('');
+
+      const badgeClass  = { claimed: 'badge-confirmed', transferred: 'badge-admin', released: 'badge-released' }[status] || 'badge-confirmed';
+      const badgeLabel  = { claimed: 'Claimed', transferred: 'Transferred', released: 'Released' }[status] || status;
 
       item.innerHTML = `
         <div class="claim-info">
@@ -196,10 +199,8 @@ function loadMyClaims() {
           ${setsHtml}
         </div>
         <div class="claim-actions">
-          <span class="badge badge-${released ? 'released' : 'confirmed'}">
-            ${released ? 'Released' : 'Confirmed'}
-          </span>
-          ${!released ? `
+          <span class="badge ${badgeClass}">${badgeLabel}</span>
+          ${status === 'claimed' ? `
             <button class="btn btn-ghost btn-sm"
               onclick="releaseClaim('${claim.id}', '${claim.eventId}')">
               Release
@@ -290,7 +291,7 @@ document.getElementById('submitClaim').addEventListener('click', async () => {
         eventId:         selectedEvent.id,
         eventTitle:      selectedEvent.title,
         sets:            selectedSets,
-        status:          'confirmed',
+        status:          'claimed',
         claimedAt:       serverTimestamp(),
       });
     });
@@ -319,8 +320,8 @@ window.releaseClaim = async function(claimId, eventId) {
       const eventRef = doc(db, 'events', eventId);
       const [claimDoc, eventDoc] = await Promise.all([tx.get(claimRef), tx.get(eventRef)]);
 
-      if (!claimDoc.exists())                     throw new Error('Claim not found.');
-      if (claimDoc.data().status === 'released')  throw new Error('Already released.');
+      if (!claimDoc.exists())                          throw new Error('Claim not found.');
+      if (claimDoc.data().status !== 'claimed')        throw new Error('These tickets can no longer be released.');
 
       const sets = claimDoc.data().sets || [];
       tx.update(claimRef, { status: 'released', releasedAt: serverTimestamp() });

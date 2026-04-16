@@ -66,7 +66,7 @@ function loadStats() {
     }
   });
   onSnapshot(collection(db, 'claims'), (snap) => {
-    const active = snap.docs.filter(d => d.data().status !== 'released').length;
+    const active = snap.docs.filter(d => !['released'].includes(d.data().status)).length;
     document.getElementById('statClaims').textContent = active;
   });
 }
@@ -335,24 +335,46 @@ function loadClaims() {
 }
 
 function buildClaimRow(c) {
-  const tr       = document.createElement('tr');
-  const released = c.status === 'released';
-  const setsHtml = (c.sets || []).map(k => escapeHtml(TICKET_SETS[k] || k)).join('<br>');
+  const tr = document.createElement('tr');
+  const { status } = c;
+  const setsHtml   = (c.sets || []).map(k => escapeHtml(TICKET_SETS[k] || k)).join('<br>');
+  const badgeClass = { claimed: 'badge-confirmed', transferred: 'badge-admin', released: 'badge-released' }[status] || 'badge-confirmed';
+  const badgeLabel = { claimed: 'Claimed', transferred: 'Transferred', released: 'Released' }[status] || status;
+  const isActive   = status === 'claimed' || status === 'transferred';
+
   tr.innerHTML = `
     <td>${escapeHtml(c.userDisplayName || c.userEmail || '—')}</td>
     <td>vs. ${escapeHtml(c.eventTitle || '—')}</td>
     <td>${c.claimedAt ? formatDateShort(c.claimedAt) : '—'}</td>
     <td style="font-size:13px">${setsHtml || '—'}</td>
-    <td><span class="badge badge-${released ? 'released' : 'confirmed'}">${released ? 'Released' : 'Confirmed'}</span></td>
+    <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
     <td>
-      ${!released ? `
-        <button class="btn btn-ghost btn-sm"
-          onclick="adminCancelClaim('${c.id}', '${c.eventId}', '${escapeHtml(c.userDisplayName || '')}')">
-          Cancel
-        </button>` : '—'}
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${status === 'claimed' ? `
+          <button class="btn btn-accent btn-sm"
+            onclick="markTransferred('${c.id}', '${escapeHtml(c.userDisplayName || '')}')">
+            Mark Transferred
+          </button>` : ''}
+        ${isActive ? `
+          <button class="btn btn-ghost btn-sm"
+            onclick="adminCancelClaim('${c.id}', '${c.eventId}', '${escapeHtml(c.userDisplayName || '')}')">
+            Cancel
+          </button>` : '—'}
+      </div>
     </td>`;
   return tr;
 }
+
+window.markTransferred = async function(claimId, userName) {
+  const ok = await showConfirm(`Mark ${userName}'s tickets as Transferred? The claim will be locked and they won't be able to release it.`, 'Mark Transferred');
+  if (!ok) return;
+  try {
+    await updateDoc(doc(db, 'claims', claimId), { status: 'transferred', transferredAt: serverTimestamp() });
+    showToast(`Tickets marked as transferred.`, 'success');
+  } catch (err) {
+    showToast(err.message || 'Failed to update claim.', 'error');
+  }
+};
 
 window.adminCancelClaim = async function(claimId, eventId, userName) {
   const ok = await showConfirm(`Cancel ${userName}'s claim? Ticket sets will be returned to available.`, 'Cancel Claim');
@@ -365,6 +387,7 @@ window.adminCancelClaim = async function(claimId, eventId, userName) {
       const [claimDoc, eventDoc] = await Promise.all([tx.get(claimRef), tx.get(eventRef)]);
 
       if (!claimDoc.exists()) throw new Error('Claim not found.');
+      if (claimDoc.data().status === 'released') throw new Error('Already released.');
       const sets = claimDoc.data().sets || [];
       tx.update(claimRef, { status: 'released', releasedAt: serverTimestamp(), releasedByAdmin: true });
       if (eventDoc.exists() && sets.length > 0) {
