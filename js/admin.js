@@ -92,17 +92,19 @@ function loadEvents() {
 function buildEventRow(id, ev) {
   const tr = document.createElement('tr');
   const setsHtml = Object.entries(TICKET_SETS).map(([key, label]) => {
-    const avail = ev.ticketSets?.[key]?.available;
-    const short = label.split('·').pop().trim();   // "Seats 12–13" etc.
-    return `<span class="badge ${avail ? 'badge-available' : 'badge-full'}" style="margin:2px">${escapeHtml(short)}</span>`;
+    const avail  = ev.ticketSets?.[key]?.available;
+    const price  = ev.ticketSets?.[key]?.price;
+    const short  = label.split('·').pop().trim();
+    const priceStr = price != null ? ` · $${Number(price).toFixed(2)}` : '';
+    return `<div style="display:flex;align-items:center;gap:5px;margin:2px 0">
+      <span class="badge ${avail ? 'badge-available' : 'badge-full'}">${escapeHtml(short)}</span>
+      ${priceStr ? `<span style="font-size:12px;color:var(--text-muted)">${priceStr}</span>` : ''}
+    </div>`;
   }).join('');
-  const priceHtml = ev.price ? `$${Number(ev.price).toFixed(2)}` : '—';
   tr.innerHTML = `
     <td><strong>vs. ${escapeHtml(ev.title)}</strong></td>
     <td>${formatDate(ev.date)}</td>
-    <td><div style="display:flex;flex-wrap:wrap">${setsHtml}</div></td>
-    <td>${priceHtml}</td>
-    <td>${ev.deadline ? formatDateShort(ev.deadline) : '—'}</td>
+    <td>${setsHtml}</td>
     <td>
       <div style="display:flex;gap:6px">
         <button class="btn btn-outline btn-sm" onclick="openEditEventModal('${id}')">Edit</button>
@@ -128,13 +130,13 @@ window.openEditEventModal = async function(id) {
   const ev = snap.data();
 
   document.getElementById('eventModalTitle').textContent = 'Edit Event';
-  document.getElementById('evTitle').value    = ev.title || '';
-  document.getElementById('evPrice').value    = ev.price != null ? ev.price : '';
-  document.getElementById('evDate').value     = ev.date     ? toDatetimeLocal(ev.date.toDate())     : '';
-  document.getElementById('evDeadline').value = ev.deadline ? toDatetimeLocal(ev.deadline.toDate()) : '';
+  document.getElementById('evTitle').value = ev.title || '';
+  document.getElementById('evDate').value  = ev.date ? toDatetimeLocal(ev.date.toDate()) : '';
 
   Object.keys(TICKET_SETS).forEach(key => {
-    document.getElementById(`set_${key}`).checked = ev.ticketSets?.[key]?.available ?? false;
+    document.getElementById(`set_${key}`).checked     = ev.ticketSets?.[key]?.available ?? false;
+    const price = ev.ticketSets?.[key]?.price;
+    document.getElementById(`price_${key}`).value     = price != null ? price : '';
   });
 
   document.getElementById('eventError').classList.add('hidden');
@@ -154,10 +156,8 @@ window.submitEvent = async function() {
   const errEl = document.getElementById('eventError');
   errEl.classList.add('hidden');
 
-  const title       = document.getElementById('evTitle').value.trim();
-  const dateStr     = document.getElementById('evDate').value;
-  const deadlineStr = document.getElementById('evDeadline').value;
-  const priceVal    = parseFloat(document.getElementById('evPrice').value);
+  const title   = document.getElementById('evTitle').value.trim();
+  const dateStr = document.getElementById('evDate').value;
 
   if (!title || !dateStr) {
     errEl.textContent = 'Opponent and date are required.';
@@ -167,7 +167,11 @@ window.submitEvent = async function() {
 
   const ticketSets = {};
   Object.keys(TICKET_SETS).forEach(key => {
-    ticketSets[key] = { available: document.getElementById(`set_${key}`).checked };
+    const priceVal = parseFloat(document.getElementById(`price_${key}`).value);
+    ticketSets[key] = {
+      available: document.getElementById(`set_${key}`).checked,
+      price: isNaN(priceVal) ? null : priceVal,
+    };
   });
 
   const btn = document.getElementById('submitEvent');
@@ -176,11 +180,9 @@ window.submitEvent = async function() {
 
   const data = {
     title,
-    date:       Timestamp.fromDate(new Date(dateStr)),
-    deadline:   deadlineStr ? Timestamp.fromDate(new Date(deadlineStr)) : null,
-    price:      isNaN(priceVal) ? null : priceVal,
+    date:      Timestamp.fromDate(new Date(dateStr)),
     ticketSets,
-    updatedAt:  serverTimestamp(),
+    updatedAt: serverTimestamp(),
   };
 
   try {

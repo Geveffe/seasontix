@@ -96,29 +96,21 @@ function buildEventCard(ev) {
   const card = document.createElement('div');
   card.className = 'event-card';
 
-  const anyAvail    = Object.values(ev.ticketSets || {}).some(s => s.available);
-  const deadlinePast = ev.deadline && ev.deadline.toDate() < new Date();
-  const canClaim    = anyAvail && !deadlinePast;
+  const anyAvail = Object.values(ev.ticketSets || {}).some(s => s.available);
 
   const setsHtml = Object.entries(TICKET_SETS).map(([key, label]) => {
     const avail = ev.ticketSets?.[key]?.available;
+    const price = ev.ticketSets?.[key]?.price;
+    const priceStr = price != null ? `<span style="font-size:12px;color:var(--text-muted);margin-right:6px">$${Number(price).toFixed(2)}</span>` : '';
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
         <span>${escapeHtml(label)}</span>
-        <span class="badge ${avail ? 'badge-available' : 'badge-full'}" style="margin-left:8px">
-          ${avail ? 'Open' : 'Taken'}
-        </span>
+        <div style="display:flex;align-items:center;flex-shrink:0">
+          ${priceStr}
+          <span class="badge ${avail ? 'badge-available' : 'badge-full'}">${avail ? 'Open' : 'Taken'}</span>
+        </div>
       </div>`;
   }).join('');
-
-  const priceHtml = ev.price
-    ? `<div style="font-size:13px;color:var(--text-muted);margin-top:8px">$${Number(ev.price).toFixed(2)} per set</div>`
-    : '';
-
-  const deadlineHtml = ev.deadline ? `
-    <div class="deadline ${deadlineClass(ev.deadline)}" style="margin-top:8px">
-      ⏰ Claim by ${formatDateShort(ev.deadline)}
-    </div>` : '';
 
   card.innerHTML = `
     <div class="event-card-header">
@@ -126,25 +118,15 @@ function buildEventCard(ev) {
       <div class="event-title">Seahawks vs. ${escapeHtml(ev.title)}</div>
     </div>
     <div class="event-card-body">
-      <div style="display:flex;flex-direction:column;gap:6px">${setsHtml}</div>
-      ${priceHtml}
-      ${deadlineHtml}
+      <div style="display:flex;flex-direction:column;gap:8px">${setsHtml}</div>
     </div>
     <div class="event-card-footer">
-      <button class="btn btn-primary" ${canClaim ? '' : 'disabled'}
+      <button class="btn btn-primary" ${anyAvail ? '' : 'disabled'}
         onclick="openClaimModal('${escapeHtml(ev.id)}')">
-        ${!anyAvail ? 'All Sets Taken' : deadlinePast ? 'Deadline Passed' : 'Claim Tickets'}
+        ${anyAvail ? 'Claim Tickets' : 'All Sets Taken'}
       </button>
     </div>`;
   return card;
-}
-
-function deadlineClass(ts) {
-  if (!ts) return '';
-  const diff = ts.toDate() - new Date();
-  if (diff < 0)                    return 'deadline-passed';
-  if (diff < 48 * 3600 * 1000)    return 'deadline-soon';
-  return 'deadline-ok';
 }
 
 // ---- My Claims --------------------------------------------------
