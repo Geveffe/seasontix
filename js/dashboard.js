@@ -283,6 +283,7 @@ document.getElementById('submitClaim').addEventListener('click', async () => {
   } catch (err) {
     errEl.textContent = err.message || 'Failed to claim. Please try again.';
     errEl.classList.remove('hidden');
+  } finally {
     btn.disabled    = false;
     btn.textContent = 'Confirm Claim';
   }
