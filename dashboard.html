@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Season Tix — Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="app-header">
+    <a href="dashboard.html" class="header-brand">
+      <span class="brand-icon">🎟️</span>
+      <span class="brand-name">Season Tix</span>
+    </a>
+
+    <nav class="header-nav">
+      <a href="dashboard.html" class="nav-link active">My Tickets</a>
+      <a href="admin.html" class="nav-link hidden" id="adminLink">Admin</a>
+    </nav>
+
+    <div class="header-user">
+      <div class="user-avatar" id="userInitial"></div>
+      <span class="user-name" id="userName"></span>
+      <button id="logoutBtn" class="btn btn-ghost btn-sm" style="border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.9)">
+        Sign Out
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================== MAIN ===================== -->
+  <main class="app-main">
+
+    <div class="page-header">
+      <h1>Season Tickets</h1>
+      <p>Claim your seats and manage your reservations</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-panel="panelGames">Available Games</button>
+      <button class="tab-btn"        data-panel="panelMyClaims">My Claims</button>
+    </div>
+
+    <!-- Available Games -->
+    <div id="panelGames" class="tab-panel active">
+      <div id="eventsContainer">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+
+    <!-- My Claims -->
+    <div id="panelMyClaims" class="tab-panel">
+      <div id="claimsContainer">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===================== CLAIM MODAL ===================== -->
+  <div id="claimModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Claim Tickets</h3>
+        <button class="modal-close" onclick="closeClaimModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:15px;font-weight:600;margin-bottom:4px" id="claimEventTitle"></p>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">
+          <span id="claimSeatsMax"></span> seats available
+        </p>
+
+        <div class="form-group">
+          <label>Number of Seats</label>
+          <div class="seat-selector">
+            <button class="seat-btn" onclick="adjustSeats(-1)">−</button>
+            <input type="number" id="claimSeats" value="1" min="1" max="6" readonly>
+            <button class="seat-btn" onclick="adjustSeats(1)">+</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="claimNotes">Notes (optional)</label>
+          <input type="text" id="claimNotes" placeholder="e.g. bringing a guest">
+        </div>
+
+        <div id="claimError" class="error-msg hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeClaimModal()">Cancel</button>
+        <button class="btn btn-primary" id="submitClaim">Confirm Claim</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

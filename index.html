@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Season Tix — Sign In</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-page">
+
+  <div class="auth-container">
+    <div class="auth-card">
+
+      <div class="auth-header">
+        <span class="logo">🎟️</span>
+        <h1>Season Tix</h1>
+        <p class="auth-subtitle">Claim your seats for the season</p>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div id="loginForm" class="auth-form">
+        <h2>Welcome back</h2>
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <div id="loginError" class="error-msg hidden"></div>
+        <button id="loginBtn" class="btn btn-primary btn-full">Sign In</button>
+        <p class="auth-switch">
+          Don't have an account? <a href="#" id="showSignup">Sign up</a>
+        </p>
+      </div>
+
+      <!-- SIGNUP FORM -->
+      <div id="signupForm" class="auth-form hidden">
+        <h2>Create account</h2>
+        <div class="form-group">
+          <label for="signupName">Your Name</label>
+          <input type="text" id="signupName" placeholder="Jane Smith" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="signupEmail">Email</label>
+          <input type="email" id="signupEmail" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="signupPassword">Password</label>
+          <input type="password" id="signupPassword" placeholder="Min. 8 characters" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label for="signupConfirm">Confirm Password</label>
+          <input type="password" id="signupConfirm" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <div id="signupError" class="error-msg hidden"></div>
+        <button id="signupBtn" class="btn btn-primary btn-full">Create Account</button>
+        <p class="auth-switch">
+          Already have an account? <a href="#" id="showLogin">Sign in</a>
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="js/auth.js"></script>
+</body>
+</html>

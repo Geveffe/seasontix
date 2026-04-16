@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function setupComplete() {
+      return exists(/databases/$(database)/documents/config/setup);
+    }
+
+    // ---- CONFIG ----
+    // 'setup' doc is readable by anyone (to check if first-run is done).
+    // Writable only before setup completes, or by an admin afterward.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if !setupComplete() || isAdmin();
+    }
+
+    // ---- USERS ----
+    match /users/{userId} {
+      allow read: if isAuth();
+
+      // Creating own profile: role must be 'user' — unless this is the first
+      // admin being created during setup (before config/setup exists).
+      allow create: if isAuth() &&
+        request.auth.uid == userId && (
+          request.resource.data.role == 'user' ||
+          (!setupComplete() && request.resource.data.role == 'admin')
+        );
+
+      // Users can update their own profile but cannot change their role.
+      // Admins can update any profile field.
+      allow update: if isAdmin() ||
+        (isAuth() && request.auth.uid == userId &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+
+      allow delete: if isAdmin();
+    }
+
+    // ---- EVENTS ----
+    match /events/{eventId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ---- CLAIMS ----
+    match /claims/{claimId} {
+      // Admins see all claims; users see only their own.
+      allow read: if isAdmin() ||
+        (isAuth() && resource.data.userId == request.auth.uid);
+
+      // Users can only create claims for themselves.
+      allow create: if isAuth() &&
+        request.resource.data.userId == request.auth.uid;
+
+      // Users can only set status to 'released' on their own claims.
+      // Admins can do anything.
+      allow update: if isAdmin() ||
+        (isAuth() &&
+         resource.data.userId == request.auth.uid &&
+         request.resource.data.status == 'released');
+
+      allow delete: if isAdmin();
+    }
+  }
+}

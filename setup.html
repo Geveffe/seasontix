@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Season Tix — First-Time Setup</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-page">
+
+  <div class="auth-container">
+    <div class="auth-card">
+
+      <div class="auth-header">
+        <span class="logo">🎟️</span>
+        <h1>Season Tix</h1>
+        <p class="auth-subtitle">Admin setup — run this once</p>
+      </div>
+
+      <!-- SETUP FORM -->
+      <div id="setupSection">
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:6px">Create admin account</h2>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:22px">
+          This page creates the first (admin) account. Once complete it locks permanently.
+        </p>
+
+        <div id="setupError"   class="error-msg  hidden"></div>
+        <div id="setupSuccess" class="success-msg hidden"></div>
+
+        <div id="setupForm">
+          <div class="form-group">
+            <label for="setupName">Your Name</label>
+            <input type="text" id="setupName" placeholder="Jeff West" autocomplete="name">
+          </div>
+          <div class="form-group">
+            <label for="setupEmail">Email</label>
+            <input type="email" id="setupEmail" placeholder="you@example.com" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label for="setupPassword">Password</label>
+            <input type="password" id="setupPassword" placeholder="Min. 8 characters" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="setupConfirm">Confirm Password</label>
+            <input type="password" id="setupConfirm" placeholder="••••••••" autocomplete="new-password">
+          </div>
+          <button id="setupBtn" class="btn btn-accent btn-full">Create Admin Account</button>
+        </div>
+      </div>
+
+      <!-- ALREADY DONE -->
+      <div id="doneSection" class="hidden" style="text-align:center;padding:12px 0">
+        <div style="font-size:48px;margin-bottom:12px">✅</div>
+        <p style="font-weight:700;font-size:16px;margin-bottom:8px">Setup already complete</p>
+        <p style="font-size:14px;color:var(--text-muted);margin-bottom:24px">
+          An admin account has already been created.
+        </p>
+        <a href="index.html" class="btn btn-primary">Go to Sign In</a>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="js/setup.js"></script>
+</body>
+</html>

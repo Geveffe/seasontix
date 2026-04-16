@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Season Tix — Admin</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="app-header">
+    <a href="admin.html" class="header-brand">
+      <span class="brand-icon">🎟️</span>
+      <span class="brand-name">Season Tix</span>
+    </a>
+
+    <nav class="header-nav">
+      <a href="dashboard.html" class="nav-link">My Tickets</a>
+      <a href="admin.html" class="nav-link active">
+        Admin &nbsp;<span class="badge badge-admin" style="font-size:10px">Admin</span>
+      </a>
+    </nav>
+
+    <div class="header-user">
+      <div class="user-avatar" id="userInitial"></div>
+      <span class="user-name" id="userName"></span>
+      <button id="logoutBtn" class="btn btn-ghost btn-sm" style="border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.9)">
+        Sign Out
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================== MAIN ===================== -->
+  <main class="app-main">
+
+    <div class="page-header">
+      <h1>Admin Panel</h1>
+      <p>Manage events, members, and ticket claims</p>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Events</div>
+        <div class="stat-value" id="statEvents">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active Claims</div>
+        <div class="stat-value" id="statClaims">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Members</div>
+        <div class="stat-value" id="statUsers">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Seats Available</div>
+        <div class="stat-value" id="statAvailSeats">—</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-panel="panelEvents">Events</button>
+      <button class="tab-btn"        data-panel="panelUsers">Members</button>
+      <button class="tab-btn"        data-panel="panelClaims">Claims</button>
+    </div>
+
+    <!-- ===== EVENTS TAB ===== -->
+    <div id="panelEvents" class="tab-panel active">
+      <div class="section-header">
+        <h2>Upcoming Events</h2>
+        <button class="btn btn-accent" onclick="openAddEventModal()">+ Add Event</button>
+      </div>
+      <div class="card">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Date &amp; Time</th>
+                <th>Venue</th>
+                <th>Seats</th>
+                <th>Claim Deadline</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="eventsBody">
+              <tr><td colspan="7" style="text-align:center;padding:32px">
+                <div class="spinner" style="margin:auto"></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== USERS TAB ===== -->
+    <div id="panelUsers" class="tab-panel">
+      <div class="section-header">
+        <h2>Members</h2>
+      </div>
+      <div class="card">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Joined</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersBody">
+              <tr><td colspan="5" style="text-align:center;padding:32px">
+                <div class="spinner" style="margin:auto"></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CLAIMS TAB ===== -->
+    <div id="panelClaims" class="tab-panel">
+      <div class="section-header">
+        <h2>All Claims</h2>
+      </div>
+      <div class="card">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Event</th>
+                <th>Claimed On</th>
+                <th>Seats</th>
+                <th>Notes</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="claimsBody">
+              <tr><td colspan="7" style="text-align:center;padding:32px">
+                <div class="spinner" style="margin:auto"></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ===================== EVENT MODAL ===================== -->
+  <div id="eventModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="eventModalTitle">Add Event</h3>
+        <button class="modal-close" onclick="closeEventModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="eventError" class="error-msg hidden"></div>
+
+        <form id="eventForm" onsubmit="return false">
+          <div class="form-group">
+            <label for="evTitle">Event Title *</label>
+            <input type="text" id="evTitle" placeholder="Bears vs Packers" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="evDate">Date &amp; Time *</label>
+              <input type="datetime-local" id="evDate" required>
+            </div>
+            <div class="form-group">
+              <label for="evVenue">Venue</label>
+              <input type="text" id="evVenue" placeholder="Soldier Field">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="evTotalSeats">Total Seats Available *</label>
+              <input type="number" id="evTotalSeats" min="1" placeholder="4" required>
+            </div>
+            <div class="form-group">
+              <label for="evAvailSeats">Currently Available *</label>
+              <input type="number" id="evAvailSeats" min="0" placeholder="4" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="evDeadline">Claim Deadline (optional)</label>
+            <input type="datetime-local" id="evDeadline">
+          </div>
+          <div class="form-group">
+            <label for="evNotes">Notes</label>
+            <textarea id="evNotes" placeholder="e.g. Section 114, Row 12 — bring ID"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeEventModal()">Cancel</button>
+        <button class="btn btn-primary" id="submitEvent" onclick="submitEvent()">Save Event</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/admin.js"></script>
+</body>
+</html>
