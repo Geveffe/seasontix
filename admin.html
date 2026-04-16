@@ -54,6 +54,10 @@
         <div class="stat-value" id="statUsers">—</div>
       </div>
       <div class="stat-card">
+        <div class="stat-label">Pending Approval</div>
+        <div class="stat-value" id="statPending">—</div>
+      </div>
+      <div class="stat-card">
         <div class="stat-label">Seats Available</div>
         <div class="stat-value" id="statAvailSeats">—</div>
       </div>
@@ -62,7 +66,7 @@
     <!-- Tabs -->
     <div class="tabs">
       <button class="tab-btn active" data-panel="panelEvents">Events</button>
-      <button class="tab-btn"        data-panel="panelUsers">Members</button>
+      <button class="tab-btn"        data-panel="panelUsers">Members <span id="pendingBadge" class="badge badge-admin hidden" style="font-size:10px;vertical-align:middle;margin-left:4px"></span></button>
       <button class="tab-btn"        data-panel="panelClaims">Claims</button>
     </div>
 
@@ -109,12 +113,13 @@
                 <th>Name</th>
                 <th>Email</th>
                 <th>Role</th>
+                <th>Status</th>
                 <th>Joined</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="usersBody">
-              <tr><td colspan="5" style="text-align:center;padding:32px">
+              <tr><td colspan="6" style="text-align:center;padding:32px">
                 <div class="spinner" style="margin:auto"></div>
               </td></tr>
             </tbody>

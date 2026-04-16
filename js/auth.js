@@ -86,6 +86,7 @@ async function handleGoogleSignIn(errorId) {
         email:       cred.user.email,
         displayName: cred.user.displayName || cred.user.email,
         role:        'user',
+        status:      'pending',
         createdAt:   serverTimestamp(),
       });
     }
@@ -154,8 +155,9 @@ document.getElementById('signupBtn').addEventListener('click', async () => {
     await setDoc(doc(db, 'users', cred.user.uid), {
       email,
       displayName: name,
-      role: 'user',
-      createdAt: serverTimestamp(),
+      role:        'user',
+      status:      'pending',
+      createdAt:   serverTimestamp(),
     });
     // onAuthStateChanged handles the redirect
   } catch (err) {

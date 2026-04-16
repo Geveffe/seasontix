@@ -31,6 +31,14 @@ requireAuth(async (user, profile) => {
     window.location.href = 'index.html';
   });
 
+  // Pending users see a waiting message instead of the dashboard content
+  const approved = profile?.role === 'admin' || profile?.status === 'approved';
+  if (!approved) {
+    document.getElementById('pendingNotice').classList.remove('hidden');
+    document.getElementById('mainContent').classList.add('hidden');
+    return;
+  }
+
   setupTabs();
   loadEvents();
   loadMyClaims();

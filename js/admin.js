@@ -53,7 +53,17 @@ function loadStats() {
     document.getElementById('statAvailSeats').textContent = totalSeats;
   });
   onSnapshot(collection(db, 'users'), (snap) => {
-    document.getElementById('statUsers').textContent = snap.size;
+    const users   = snap.docs.map(d => d.data());
+    const pending = users.filter(u => u.role !== 'admin' && u.status !== 'approved').length;
+    document.getElementById('statUsers').textContent   = snap.size;
+    document.getElementById('statPending').textContent = pending;
+    const badge = document.getElementById('pendingBadge');
+    if (pending > 0) {
+      badge.textContent = pending;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
   });
   onSnapshot(collection(db, 'claims'), (snap) => {
     const active = snap.docs.filter(d => d.data().status !== 'released').length;
@@ -245,8 +255,13 @@ function loadUsers() {
 }
 
 function buildUserRow(u) {
-  const tr = document.createElement('tr');
-  const isAdmin = u.role === 'admin';
+  const tr        = document.createElement('tr');
+  const isAdmin   = u.role === 'admin';
+  const approved  = isAdmin || u.status === 'approved';
+  const statusLabel = isAdmin ? '—' : (approved ? 'Approved' : 'Pending');
+  const statusBadge = isAdmin ? '—'
+    : `<span class="badge ${approved ? 'badge-confirmed' : 'badge-released'}">${statusLabel}</span>`;
+
   tr.innerHTML = `
     <td>
       <div style="display:flex;align-items:center;gap:10px">
@@ -258,9 +273,15 @@ function buildUserRow(u) {
     </td>
     <td>${escapeHtml(u.email)}</td>
     <td><span class="badge badge-${isAdmin ? 'admin' : 'user'}">${isAdmin ? 'Admin' : 'Member'}</span></td>
+    <td>${statusBadge}</td>
     <td>${u.createdAt ? formatDateShort(u.createdAt) : '—'}</td>
     <td>
       <div style="display:flex;gap:6px">
+        ${!isAdmin ? `
+          <button class="btn btn-${approved ? 'ghost' : 'success'} btn-sm"
+            onclick="${approved ? 'revokeApproval' : 'approveUser'}('${u.id}', '${escapeHtml(u.displayName || u.email)}')">
+            ${approved ? 'Revoke' : 'Approve'}
+          </button>` : ''}
         <button class="btn btn-outline btn-sm"
           onclick="toggleRole('${u.id}', '${u.role}', '${escapeHtml(u.displayName || u.email)}')">
           ${isAdmin ? 'Demote' : 'Make Admin'}
@@ -273,6 +294,26 @@ function buildUserRow(u) {
     </td>`;
   return tr;
 }
+
+window.approveUser = async function(userId, name) {
+  try {
+    await updateDoc(doc(db, 'users', userId), { status: 'approved' });
+    showToast(`${name} approved — they can now access the dashboard.`, 'success');
+  } catch (err) {
+    showToast(err.message || 'Failed to approve user.', 'error');
+  }
+};
+
+window.revokeApproval = async function(userId, name) {
+  const ok = await showConfirm(`Revoke access for ${name}? They will see the pending screen until re-approved.`, 'Revoke');
+  if (!ok) return;
+  try {
+    await updateDoc(doc(db, 'users', userId), { status: 'pending' });
+    showToast(`${name}'s access revoked.`, 'info');
+  } catch (err) {
+    showToast(err.message || 'Failed to revoke access.', 'error');
+  }
+};
 
 window.toggleRole = async function(userId, currentRole, name) {
   const newRole = currentRole === 'admin' ? 'user' : 'admin';
