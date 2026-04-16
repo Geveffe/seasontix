@@ -112,7 +112,7 @@ export function showConfirm(message, confirmLabel = 'Confirm') {
 // ---- Ticket set definitions ------------------------------------
 
 export const TICKET_SETS = {
+  s130m57:    'Sec 130 · Row M · Seats 5–7',
   s149bb1213: 'Sec 149 · Row BB · Seats 12–13',
   s149bb1415: 'Sec 149 · Row BB · Seats 14–15',
-  s130m57:    'Sec 130 · Row M · Seats 5–7',
 };
