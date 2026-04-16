@@ -159,8 +159,8 @@ window.submitEvent = async function() {
   const title   = document.getElementById('evTitle').value.trim();
   const dateStr = document.getElementById('evDate').value;
 
-  if (!title || !dateStr) {
-    errEl.textContent = 'Opponent and date are required.';
+  if (!title) {
+    errEl.textContent = 'Opponent is required.';
     errEl.classList.remove('hidden');
     return;
   }
@@ -180,7 +180,7 @@ window.submitEvent = async function() {
 
   const data = {
     title,
-    date:      Timestamp.fromDate(new Date(dateStr)),
+    date:      dateStr ? Timestamp.fromDate(new Date(dateStr)) : null,
     ticketSets,
     updatedAt: serverTimestamp(),
   };
