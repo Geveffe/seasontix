@@ -4,6 +4,8 @@ import { auth, db } from './firebase-config.js';
 import {
   createUserWithEmailAndPassword,
   updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
   doc, getDoc, setDoc, serverTimestamp,
@@ -35,6 +37,65 @@ function showSuccess(msg) {
   errorMsg.classList.add('hidden');
 }
 
+// ---- Google admin setup ----
+document.getElementById('googleSetupBtn').addEventListener('click', async () => {
+  errorMsg.classList.add('hidden');
+
+  const existing = await getDoc(doc(db, 'config', 'setup'));
+  if (existing.exists()) { showError('Setup has already been completed.'); return; }
+
+  const provider = new GoogleAuthProvider();
+  let cred;
+  try {
+    cred = await signInWithPopup(auth, provider);
+  } catch (err) {
+    if (err.code !== 'auth/popup-closed-by-user' &&
+        err.code !== 'auth/cancelled-popup-request') {
+      showError('Google sign-in failed. Please try again.');
+    }
+    return;
+  }
+
+  const btn = document.getElementById('googleSetupBtn');
+  btn.disabled = true;
+  btn.textContent = 'Creating account…';
+
+  try {
+    const userRef  = doc(db, 'users', cred.user.uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists() && userSnap.data().role !== 'admin') {
+      showError('This Google account is already registered as a regular user. Please use a different account for admin setup.');
+      btn.disabled = false;
+      btn.textContent = 'Create Admin Account with Google';
+      return;
+    }
+
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        email:       cred.user.email,
+        displayName: cred.user.displayName || cred.user.email,
+        role:        'admin',
+        createdAt:   serverTimestamp(),
+      });
+    }
+
+    await setDoc(doc(db, 'config', 'setup'), {
+      completedAt: serverTimestamp(),
+      adminUid:    cred.user.uid,
+      adminEmail:  cred.user.email,
+    });
+
+    showSuccess('Admin account created! Redirecting to sign in…');
+    setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Create Admin Account with Google';
+    showError(err.message || 'Something went wrong.');
+  }
+});
+
+// ---- Email admin setup ----
 document.getElementById('setupBtn').addEventListener('click', async () => {
   errorMsg.classList.add('hidden');
 
