@@ -7,6 +7,7 @@ import {
   onAuthStateChanged,
   updateProfile,
   GoogleAuthProvider,
+  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -106,9 +107,23 @@ if (googleRedirectPending) {
 }
 
 // ---- Google Sign-In ----
-function handleGoogleSignIn() {
-  sessionStorage.setItem('googleRedirect', '1');
-  signInWithRedirect(auth, new GoogleAuthProvider());
+// Popup works on all browsers including iOS Safari, which blocks the
+// cross-origin iframe that signInWithRedirect relies on (ITP). Only fall back
+// to redirect if the browser explicitly blocks the popup window itself.
+async function handleGoogleSignIn() {
+  hideError('loginError');
+  try {
+    const result = await signInWithPopup(auth, new GoogleAuthProvider());
+    await ensureProfile(result.user);
+    window.location.href = 'dashboard.html';
+  } catch (err) {
+    if (err.code === 'auth/popup-blocked') {
+      sessionStorage.setItem('googleRedirect', '1');
+      signInWithRedirect(auth, new GoogleAuthProvider());
+    } else if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+      showError('loginError', friendlyError(err.code));
+    }
+  }
 }
 
 document.getElementById('googleLoginBtn').addEventListener('click',  handleGoogleSignIn);
