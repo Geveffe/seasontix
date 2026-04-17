@@ -7,7 +7,6 @@ import {
   onAuthStateChanged,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -107,22 +106,9 @@ if (googleRedirectPending) {
 }
 
 // ---- Google Sign-In ----
-// Try popup first (no domain config needed). If the browser blocks the popup,
-// fall back to the redirect flow automatically.
-async function handleGoogleSignIn() {
-  hideError('loginError');
-  try {
-    const result = await signInWithPopup(auth, new GoogleAuthProvider());
-    await ensureProfile(result.user);
-    window.location.href = 'dashboard.html';
-  } catch (err) {
-    if (err.code === 'auth/popup-blocked') {
-      sessionStorage.setItem('googleRedirect', '1');
-      signInWithRedirect(auth, new GoogleAuthProvider());
-    } else if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-      showError('loginError', friendlyError(err.code));
-    }
-  }
+function handleGoogleSignIn() {
+  sessionStorage.setItem('googleRedirect', '1');
+  signInWithRedirect(auth, new GoogleAuthProvider());
 }
 
 document.getElementById('googleLoginBtn').addEventListener('click',  handleGoogleSignIn);
