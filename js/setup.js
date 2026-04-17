@@ -5,8 +5,7 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
   GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
   doc, getDoc, setDoc, serverTimestamp,
@@ -75,29 +74,22 @@ async function init() {
   if (snap.exists()) {
     setupSection.classList.add('hidden');
     doneSection.classList.remove('hidden');
-    return;
-  }
-
-  // Check if we're returning from a Google redirect
-  try {
-    const result = await getRedirectResult(auth);
-    if (result) {
-      await finalizeGoogleAdmin(result.user);
-    }
-  } catch (err) {
-    if (err.code !== 'auth/user-cancelled') {
-      showError(`Google sign-in failed: ${err.code || err.message}`);
-    }
   }
 }
 
 init();
 
 // ---- Google admin setup ----
-document.getElementById('googleSetupBtn').addEventListener('click', () => {
+document.getElementById('googleSetupBtn').addEventListener('click', async () => {
   errorMsg.classList.add('hidden');
-  signInWithRedirect(auth, new GoogleAuthProvider());
-  // Browser navigates away; result handled by init() on return.
+  try {
+    const result = await signInWithPopup(auth, new GoogleAuthProvider());
+    await finalizeGoogleAdmin(result.user);
+  } catch (err) {
+    if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+      showError(`Google sign-in failed: ${err.code || err.message}`);
+    }
+  }
 });
 
 // ---- Email admin setup ----

@@ -7,7 +7,9 @@ import { doc, getDoc }        from "https://www.gstatic.com/firebasejs/10.7.1/fi
 // ---- Auth guards ------------------------------------------------
 
 export function requireAuth(callback) {
-  onAuthStateChanged(auth, async (user) => {
+  // unsubscribe after first non-pending call to avoid double-fires
+  const unsub = onAuthStateChanged(auth, async (user) => {
+    unsub();
     if (!user) { window.location.href = 'index.html'; return; }
     const profile = await getUserProfile(user.uid);
     callback(user, profile);
@@ -15,7 +17,8 @@ export function requireAuth(callback) {
 }
 
 export function requireAdmin(callback) {
-  onAuthStateChanged(auth, async (user) => {
+  const unsub = onAuthStateChanged(auth, async (user) => {
+    unsub();
     if (!user) { window.location.href = 'index.html'; return; }
     const profile = await getUserProfile(user.uid);
     if (profile?.role !== 'admin') { window.location.href = 'dashboard.html'; return; }
