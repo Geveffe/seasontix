@@ -7,18 +7,10 @@ import {
   onAuthStateChanged,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-// Flag prevents onAuthStateChanged from redirecting mid-Google-flow
-// while we're still writing the new user's Firestore document.
-let googleSignInInProgress = false;
-
-// Already logged in → go to dashboard
-onAuthStateChanged(auth, (user) => {
-  if (user && !googleSignInInProgress) window.location.href = 'dashboard.html';
-});
 
 // ---- Form toggling ----
 const loginForm  = document.getElementById('loginForm');
@@ -65,46 +57,54 @@ function friendlyError(code) {
     'auth/weak-password':         'Password must be at least 8 characters.',
     'auth/too-many-requests':     'Too many attempts — please try again later.',
     'auth/network-request-failed':'Network error. Check your connection.',
-    'auth/popup-blocked':         'Popup was blocked. Please allow popups for this site.',
     'auth/account-exists-with-different-credential':
                                   'An account already exists with this email using a different sign-in method.',
   }[code] || 'Something went wrong. Please try again.';
 }
 
-// ---- Google Sign-In ----
-async function handleGoogleSignIn(errorId) {
-  hideError(errorId);
-  const provider = new GoogleAuthProvider();
-  googleSignInInProgress = true;
+// ---- Init: resolve any pending redirect before setting up auth listener ----
+// Awaiting getRedirectResult first ensures the new-user Firestore profile is
+// written before onAuthStateChanged can redirect to the dashboard.
+async function init() {
   try {
-    const cred = await signInWithPopup(auth, provider);
-    // Create Firestore profile for first-time Google users
-    const userRef = doc(db, 'users', cred.user.uid);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) {
-      await setDoc(userRef, {
-        email:       cred.user.email,
-        displayName: cred.user.displayName || cred.user.email,
-        role:        'user',
-        status:      'pending',
-        createdAt:   serverTimestamp(),
-      });
+    const result = await getRedirectResult(auth);
+    if (result) {
+      const userRef  = doc(db, 'users', result.user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          email:       result.user.email,
+          displayName: result.user.displayName || result.user.email,
+          role:        'user',
+          status:      'pending',
+          createdAt:   serverTimestamp(),
+        });
+      }
+      window.location.href = 'dashboard.html';
+      return;
     }
-    window.location.href = 'dashboard.html';
   } catch (err) {
-    googleSignInInProgress = false;
-    // Silently ignore user-dismissed popups
-    if (err.code !== 'auth/popup-closed-by-user' &&
-        err.code !== 'auth/cancelled-popup-request') {
-      showError(errorId, err.code === 'auth/unauthorized-domain'
-        ? `This domain is not authorized in Firebase. Add it under Authentication → Settings → Authorized domains.`
-        : friendlyError(err.code));
+    if (err.code !== 'auth/user-cancelled') {
+      showError('loginError', friendlyError(err.code));
     }
   }
+
+  // No redirect in progress — redirect already-logged-in users immediately.
+  onAuthStateChanged(auth, (user) => {
+    if (user) window.location.href = 'dashboard.html';
+  });
 }
 
-document.getElementById('googleLoginBtn').addEventListener('click',  () => handleGoogleSignIn('loginError'));
-document.getElementById('googleSignupBtn').addEventListener('click', () => handleGoogleSignIn('signupError'));
+init();
+
+// ---- Google Sign-In ----
+function handleGoogleSignIn() {
+  signInWithRedirect(auth, new GoogleAuthProvider());
+  // Browser navigates away; result is handled by init() on return.
+}
+
+document.getElementById('googleLoginBtn').addEventListener('click',  handleGoogleSignIn);
+document.getElementById('googleSignupBtn').addEventListener('click', handleGoogleSignIn);
 
 // ---- Login ----
 document.getElementById('loginBtn').addEventListener('click', async () => {
