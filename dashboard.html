@@ -44,9 +44,18 @@
     <div id="pendingNotice" class="hidden" style="text-align:center;padding:48px 24px">
       <div style="font-size:48px;margin-bottom:16px">⏳</div>
       <h2 style="font-size:20px;font-weight:700;margin-bottom:8px">Pending Approval</h2>
-      <p style="color:var(--text-muted);font-size:14px;max-width:320px;margin:0 auto">
+      <p style="color:var(--text-muted);font-size:14px;max-width:320px;margin:0 auto 28px">
         Your account is waiting for admin approval. You'll be able to claim tickets once you're approved.
       </p>
+      <div style="border-top:1px solid var(--border);padding-top:24px;max-width:360px;margin:0 auto">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Have an invite code? Enter it below to get instant access.</p>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="inviteCodeInput" placeholder="HAWK-XXXX-XXXX"
+                 style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:monospace;letter-spacing:1px;text-transform:uppercase">
+          <button id="redeemCodeBtn" class="btn btn-primary">Redeem</button>
+        </div>
+        <div id="codeError" style="color:var(--error,#dc2626);font-size:13px;margin-top:8px;min-height:18px"></div>
+      </div>
     </div>
 
     <!-- Main content (hidden until approved) -->

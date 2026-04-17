@@ -29,6 +29,7 @@ requireAdmin(async (user, profile) => {
   loadEvents();
   loadUsers();
   loadClaims();
+  loadCodes();
 });
 
 // ---- Tabs -------------------------------------------------------
@@ -401,6 +402,78 @@ window.adminCancelClaim = async function(claimId, eventId, userName) {
     showToast('Claim cancelled and sets returned.', 'success');
   } catch (err) {
     showToast(err.message || 'Failed to cancel claim.', 'error');
+  }
+};
+
+// ---- Codes Tab --------------------------------------------------
+function loadCodes() {
+  const tbody = document.getElementById('codesBody');
+  tbody.innerHTML = '<tr><td colspan="5" class="loading" style="text-align:center;padding:32px"><div class="spinner" style="margin:auto"></div></td></tr>';
+
+  onSnapshot(collection(db, 'inviteCodes'), (snap) => {
+    if (snap.empty) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">No invite codes yet. Generate one to invite a new user.</td></tr>';
+      return;
+    }
+    const codes = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    tbody.innerHTML = '';
+    codes.forEach(c => tbody.appendChild(buildCodeRow(c)));
+  });
+}
+
+function buildCodeRow(c) {
+  const tr     = document.createElement('tr');
+  const isUsed = c.used;
+  tr.innerHTML = `
+    <td>
+      <div style="display:flex;align-items:center;gap:8px">
+        <code style="font-family:monospace;font-size:13px;letter-spacing:1px;background:var(--bg);padding:3px 7px;border-radius:4px;border:1px solid var(--border)">${escapeHtml(c.id)}</code>
+        <button class="btn btn-ghost btn-sm" onclick="copyCode('${escapeHtml(c.id)}')">Copy</button>
+      </div>
+    </td>
+    <td>${c.createdAt ? formatDateShort(c.createdAt) : '—'}</td>
+    <td><span class="badge ${isUsed ? 'badge-released' : 'badge-available'}">${isUsed ? 'Used' : 'Available'}</span></td>
+    <td style="font-size:13px">${isUsed ? escapeHtml(c.usedByEmail || '—') : '—'}</td>
+    <td>
+      ${!isUsed
+        ? `<button class="btn btn-danger btn-sm" onclick="deleteCode('${escapeHtml(c.id)}')">Delete</button>`
+        : '—'}
+    </td>`;
+  return tr;
+}
+
+window.generateCode = async function() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const part  = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const code  = `HAWK-${part()}-${part()}`;
+  try {
+    await setDoc(doc(db, 'inviteCodes', code), {
+      used: false,
+      createdAt: serverTimestamp(),
+      createdBy: currentUser.uid,
+    });
+    showToast(`Code "${code}" created — copy and share it.`, 'success');
+  } catch (err) {
+    showToast(err.message || 'Failed to generate code.', 'error');
+  }
+};
+
+window.copyCode = function(code) {
+  navigator.clipboard.writeText(code)
+    .then(() => showToast(`"${code}" copied to clipboard.`, 'success'))
+    .catch(() => showToast('Could not copy to clipboard.', 'error'));
+};
+
+window.deleteCode = async function(codeId) {
+  const ok = await showConfirm(`Delete code "${codeId}"? It will no longer work for new users.`, 'Delete Code');
+  if (!ok) return;
+  try {
+    await deleteDoc(doc(db, 'inviteCodes', codeId));
+    showToast('Code deleted.', 'success');
+  } catch (err) {
+    showToast(err.message || 'Failed to delete code.', 'error');
   }
 };
 

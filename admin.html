@@ -68,6 +68,7 @@
       <button class="tab-btn active" data-panel="panelEvents">Events</button>
       <button class="tab-btn"        data-panel="panelUsers">Members <span id="pendingBadge" class="badge badge-admin hidden" style="font-size:10px;vertical-align:middle;margin-left:4px"></span></button>
       <button class="tab-btn"        data-panel="panelClaims">Claims</button>
+      <button class="tab-btn"        data-panel="panelCodes">Invite Codes</button>
     </div>
 
     <!-- ===== EVENTS TAB ===== -->
@@ -145,6 +146,37 @@
             </thead>
             <tbody id="claimsBody">
               <tr><td colspan="6" style="text-align:center;padding:32px">
+                <div class="spinner" style="margin:auto"></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CODES TAB ===== -->
+    <div id="panelCodes" class="tab-panel">
+      <div class="section-header">
+        <h2>Invite Codes</h2>
+        <button class="btn btn-accent" onclick="generateCode()">+ Generate Code</button>
+      </div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
+        Each code can be used once. Share a code with a new user so they can approve their own account instantly.
+      </p>
+      <div class="card">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Created</th>
+                <th>Status</th>
+                <th>Used By</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="codesBody">
+              <tr><td colspan="5" style="text-align:center;padding:32px">
                 <div class="spinner" style="margin:auto"></div>
               </td></tr>
             </tbody>

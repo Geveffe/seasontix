@@ -44,12 +44,42 @@ service cloud.firestore {
           (!setupComplete() && request.resource.data.role == 'admin')
         );
 
-      // Users can update their own profile but cannot change their role or status.
+      // Users can update their own profile but cannot change their role.
+      // Status can only change from pending→approved when a valid invite code
+      // (already marked used by this user) is referenced in usedInviteCode.
       // Admins can update any profile field.
       allow update: if isAdmin() ||
         (isAuth() && request.auth.uid == userId &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status']));
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) &&
+         (
+           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+           (
+             resource.data.status == 'pending' &&
+             request.resource.data.status == 'approved' &&
+             request.resource.data.get('usedInviteCode', '') != '' &&
+             exists(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)) &&
+             get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)).data.used == true &&
+             get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)).data.usedBy == request.auth.uid
+           )
+         )
+        );
 
+      allow delete: if isAdmin();
+    }
+
+    // ---- INVITE CODES ----
+    match /inviteCodes/{codeId} {
+      // Admins can list all codes; authenticated users can fetch a specific code by ID.
+      allow get: if isAuth();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      // Any authenticated user can claim an unused code by marking it as used with their uid.
+      // They may not modify the original code/createdAt/createdBy fields.
+      allow update: if isAuth() &&
+        resource.data.used == false &&
+        request.resource.data.used == true &&
+        request.resource.data.usedBy == request.auth.uid &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt', 'createdBy']);
       allow delete: if isAdmin();
     }
 

@@ -3,7 +3,7 @@
 import { auth, db } from './firebase-config.js';
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, doc, getDoc, query, where, orderBy,
+  collection, doc, getDoc, updateDoc, query, where, orderBy,
   runTransaction, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
@@ -37,6 +37,7 @@ requireAuth(async (user, profile) => {
   if (!approved) {
     document.getElementById('pendingNotice').classList.remove('hidden');
     document.getElementById('mainContent').classList.add('hidden');
+    setupCodeRedemption(user);
     return;
   }
 
@@ -288,6 +289,61 @@ document.getElementById('submitClaim').addEventListener('click', async () => {
     btn.textContent = 'Confirm Claim';
   }
 });
+
+// ---- Invite Code Redemption -------------------------------------
+function setupCodeRedemption(user) {
+  const btn      = document.getElementById('redeemCodeBtn');
+  const input    = document.getElementById('inviteCodeInput');
+  const errorEl  = document.getElementById('codeError');
+
+  async function redeem() {
+    const code = input.value.trim().toUpperCase();
+    errorEl.textContent = '';
+    if (!code) { errorEl.textContent = 'Please enter a code.'; return; }
+
+    btn.disabled    = true;
+    btn.textContent = 'Redeeming…';
+
+    try {
+      const codeRef  = doc(db, 'inviteCodes', code);
+      const codeSnap = await getDoc(codeRef);
+
+      if (!codeSnap.exists()) throw new Error('Invalid code — please check and try again.');
+
+      const codeData = codeSnap.data();
+      if (codeData.used && codeData.usedBy !== user.uid) {
+        throw new Error('This code has already been used.');
+      }
+
+      // Mark code as used (idempotent if they already claimed it)
+      if (!codeData.used) {
+        await updateDoc(codeRef, {
+          used: true,
+          usedBy: user.uid,
+          usedByEmail: user.email,
+          usedAt: serverTimestamp(),
+        });
+      }
+
+      // Approve the user (Firestore rule cross-checks the code)
+      await updateDoc(doc(db, 'users', user.uid), {
+        status: 'approved',
+        usedInviteCode: code,
+      });
+
+      showToast('Code accepted! Welcome to Season Tix.', 'success');
+      window.location.reload();
+    } catch (err) {
+      errorEl.textContent = err.message || 'Failed to redeem code. Please try again.';
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Redeem';
+    }
+  }
+
+  btn.addEventListener('click', redeem);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') redeem(); });
+}
 
 // ---- Release ----------------------------------------------------
 window.releaseClaim = async function(claimId, eventId) {
