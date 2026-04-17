@@ -57,60 +57,71 @@ function friendlyError(code) {
     'auth/weak-password':         'Password must be at least 8 characters.',
     'auth/too-many-requests':     'Too many attempts — please try again later.',
     'auth/network-request-failed':'Network error. Check your connection.',
+    'auth/unauthorized-domain':   'This domain is not authorized for sign-in. Add it in Firebase Console → Authentication → Settings → Authorized domains.',
     'auth/account-exists-with-different-credential':
                                   'An account already exists with this email using a different sign-in method.',
-  }[code] || 'Something went wrong. Please try again.';
+  }[code] || `Something went wrong (${code || 'unknown'}). Please try again.`;
 }
 
-// ---- Google redirect flow ----
-// Set a sessionStorage flag before the redirect so we know on return that
-// we should call getRedirectResult instead of letting onAuthStateChanged act.
+// ---- Auth state (already-signed-in redirect + redirect-flow return) ----
+// On return from a Google redirect, getRedirectResult fires before
+// onAuthStateChanged and handles the navigation itself.
 const googleRedirectPending = Boolean(sessionStorage.getItem('googleRedirect'));
 sessionStorage.removeItem('googleRedirect');
 
-function listenForSignIn() {
-  onAuthStateChanged(auth, (user) => {
-    if (user) window.location.href = 'dashboard.html';
-  });
+async function ensureProfile(user) {
+  const userRef  = doc(db, 'users', user.uid);
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) {
+    await setDoc(userRef, {
+      email:       user.email,
+      displayName: user.displayName || user.email,
+      role:        'user',
+      status:      'pending',
+      createdAt:   serverTimestamp(),
+    });
+  }
 }
 
 if (googleRedirectPending) {
+  // Returning from a Google redirect — pick up the result.
   getRedirectResult(auth)
     .then(async (result) => {
       if (result) {
-        // First-time Google sign-in — create Firestore profile if needed.
-        const userRef  = doc(db, 'users', result.user.uid);
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) {
-          await setDoc(userRef, {
-            email:       result.user.email,
-            displayName: result.user.displayName || result.user.email,
-            role:        'user',
-            status:      'pending',
-            createdAt:   serverTimestamp(),
-          });
-        }
+        await ensureProfile(result.user);
         window.location.href = 'dashboard.html';
       } else {
-        // Result already consumed (e.g. page was refreshed) — fall back to
-        // onAuthStateChanged which will redirect if the user is still signed in.
-        listenForSignIn();
+        // Result already consumed or redirect didn't complete — check auth state.
+        onAuthStateChanged(auth, (user) => { if (user) window.location.href = 'dashboard.html'; });
       }
     })
     .catch((err) => {
-      if (err.code !== 'auth/user-cancelled') {
-        showError('loginError', friendlyError(err.code));
-      }
-      listenForSignIn();
+      // Show the real error code so we can diagnose domain/config issues.
+      showError('loginError', friendlyError(err.code));
+      onAuthStateChanged(auth, (user) => { if (user) window.location.href = 'dashboard.html'; });
     });
 } else {
-  listenForSignIn();
+  // Normal page load — redirect already-signed-in users.
+  onAuthStateChanged(auth, (user) => { if (user) window.location.href = 'dashboard.html'; });
 }
 
 // ---- Google Sign-In ----
-function handleGoogleSignIn() {
-  sessionStorage.setItem('googleRedirect', '1');
-  signInWithRedirect(auth, new GoogleAuthProvider());
+// Try popup first (no domain config needed). If the browser blocks the popup,
+// fall back to the redirect flow automatically.
+async function handleGoogleSignIn() {
+  hideError('loginError');
+  try {
+    const result = await signInWithPopup(auth, new GoogleAuthProvider());
+    await ensureProfile(result.user);
+    window.location.href = 'dashboard.html';
+  } catch (err) {
+    if (err.code === 'auth/popup-blocked') {
+      sessionStorage.setItem('googleRedirect', '1');
+      signInWithRedirect(auth, new GoogleAuthProvider());
+    } else if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+      showError('loginError', friendlyError(err.code));
+    }
+  }
 }
 
 document.getElementById('googleLoginBtn').addEventListener('click',  handleGoogleSignIn);
