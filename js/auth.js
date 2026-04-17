@@ -62,43 +62,47 @@ function friendlyError(code) {
   }[code] || 'Something went wrong. Please try again.';
 }
 
-// ---- Auth redirect coordination ----
-// getRedirectResult is kicked off immediately and stored as a promise so the
-// onAuthStateChanged listener can await it before deciding to redirect. This
-// ensures that (a) the listener is always registered (so email/password login
-// redirects work), and (b) a new Google user's Firestore profile is written
-// before any redirect fires.
-const redirectCheck = getRedirectResult(auth)
-  .then(async (result) => {
-    if (!result) return;
-    const userRef  = doc(db, 'users', result.user.uid);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) {
-      await setDoc(userRef, {
-        email:       result.user.email,
-        displayName: result.user.displayName || result.user.email,
-        role:        'user',
-        status:      'pending',
-        createdAt:   serverTimestamp(),
-      });
-    }
-    window.location.href = 'dashboard.html';
-  })
-  .catch((err) => {
-    if (err.code !== 'auth/user-cancelled') {
-      showError('loginError', friendlyError(err.code));
-    }
-  });
+// ---- Google redirect flow ----
+// sessionStorage flag survives the cross-origin redirect so we know on return
+// that we should call getRedirectResult rather than let onAuthStateChanged act.
+const googleRedirectPending = Boolean(sessionStorage.getItem('googleRedirect'));
+sessionStorage.removeItem('googleRedirect');
 
-onAuthStateChanged(auth, async (user) => {
-  await redirectCheck; // let the Google redirect flow finish first if in progress
-  if (user) window.location.href = 'dashboard.html';
+if (googleRedirectPending) {
+  getRedirectResult(auth)
+    .then(async (result) => {
+      if (!result) return; // user cancelled or no redirect in progress
+      const userRef  = doc(db, 'users', result.user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          email:       result.user.email,
+          displayName: result.user.displayName || result.user.email,
+          role:        'user',
+          status:      'pending',
+          createdAt:   serverTimestamp(),
+        });
+      }
+      window.location.href = 'dashboard.html';
+    })
+    .catch((err) => {
+      if (err.code !== 'auth/user-cancelled') {
+        showError('loginError', friendlyError(err.code));
+      }
+    });
+}
+
+// Redirect users who are already signed in when they visit this page.
+// Only runs when NOT in the middle of a Google redirect (that case is
+// handled above by getRedirectResult).
+onAuthStateChanged(auth, (user) => {
+  if (user && !googleRedirectPending) window.location.href = 'dashboard.html';
 });
 
 // ---- Google Sign-In ----
 function handleGoogleSignIn() {
+  sessionStorage.setItem('googleRedirect', '1');
   signInWithRedirect(auth, new GoogleAuthProvider());
-  // Browser navigates away; result is handled by init() on return.
 }
 
 document.getElementById('googleLoginBtn').addEventListener('click',  handleGoogleSignIn);
@@ -115,7 +119,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   setLoading('loginBtn', true);
   try {
     await signInWithEmailAndPassword(auth, email, password);
-    // onAuthStateChanged handles the redirect
+    window.location.href = 'dashboard.html';
   } catch (err) {
     setLoading('loginBtn', false);
     showError('loginError', friendlyError(err.code));
@@ -157,7 +161,7 @@ document.getElementById('signupBtn').addEventListener('click', async () => {
       status:      'pending',
       createdAt:   serverTimestamp(),
     });
-    // onAuthStateChanged handles the redirect
+    window.location.href = 'dashboard.html';
   } catch (err) {
     setLoading('signupBtn', false);
     showError('signupError', friendlyError(err.code));
