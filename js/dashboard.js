@@ -3,7 +3,7 @@
 import { auth, db } from './firebase-config.js';
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, doc, getDoc, updateDoc, query, where, orderBy,
+  collection, doc, getDoc, query, where, orderBy,
   runTransaction, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
@@ -305,30 +305,32 @@ function setupCodeRedemption(user) {
     btn.textContent = 'Redeeming…';
 
     try {
-      const codeRef  = doc(db, 'inviteCodes', code);
-      const codeSnap = await getDoc(codeRef);
+      await runTransaction(db, async (tx) => {
+        const codeRef  = doc(db, 'inviteCodes', code);
+        const codeSnap = await tx.get(codeRef);
 
-      if (!codeSnap.exists()) throw new Error('Invalid code — please check and try again.');
+        if (!codeSnap.exists()) throw new Error('Invalid code — please check and try again.');
 
-      const codeData = codeSnap.data();
-      if (codeData.used && codeData.usedBy !== user.uid) {
-        throw new Error('This code has already been used.');
-      }
+        const codeData = codeSnap.data();
+        if (codeData.used && codeData.usedBy !== user.uid) {
+          throw new Error('This code has already been used.');
+        }
 
-      // Mark code as used (idempotent if they already claimed it)
-      if (!codeData.used) {
-        await updateDoc(codeRef, {
-          used: true,
-          usedBy: user.uid,
-          usedByEmail: user.email,
-          usedAt: serverTimestamp(),
+        // Mark code as used within the same transaction as the user approval.
+        // Skip if we already claimed it on a prior attempt.
+        if (!codeData.used) {
+          tx.update(codeRef, {
+            used: true,
+            usedBy: user.uid,
+            usedByEmail: user.email,
+            usedAt: serverTimestamp(),
+          });
+        }
+
+        tx.update(doc(db, 'users', user.uid), {
+          status: 'approved',
+          usedInviteCode: code,
         });
-      }
-
-      // Approve the user (Firestore rule cross-checks the code)
-      await updateDoc(doc(db, 'users', user.uid), {
-        status: 'approved',
-        usedInviteCode: code,
       });
 
       showToast('Code accepted! Welcome to Season Tix.', 'success');

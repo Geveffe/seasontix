@@ -46,20 +46,23 @@ service cloud.firestore {
 
       // Users can update their own profile but cannot change their role.
       // Status can only change from pending→approved when a valid invite code
-      // (already marked used by this user) is referenced in usedInviteCode.
-      // Admins can update any profile field.
+      // is referenced in usedInviteCode. The code must either be currently
+      // unused (being claimed atomically) or already claimed by this user
+      // (retry case). Admins can update any profile field.
       allow update: if isAdmin() ||
         (isAuth() && request.auth.uid == userId &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) &&
+         request.resource.data.role == resource.data.role &&
          (
-           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+           request.resource.data.status == resource.data.status ||
            (
              resource.data.status == 'pending' &&
              request.resource.data.status == 'approved' &&
-             request.resource.data.get('usedInviteCode', '') != '' &&
+             ('usedInviteCode' in request.resource.data) &&
              exists(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)) &&
-             get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)).data.used == true &&
-             get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)).data.usedBy == request.auth.uid
+             (
+               !get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)).data.used ||
+               get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)).data.usedBy == request.auth.uid
+             )
            )
          )
         );
