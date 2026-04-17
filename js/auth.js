@@ -7,7 +7,8 @@ import {
   onAuthStateChanged,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -61,32 +62,55 @@ function friendlyError(code) {
   }[code] || 'Something went wrong. Please try again.';
 }
 
-// Redirect already-signed-in users away from the login page.
-onAuthStateChanged(auth, (user) => {
-  if (user) window.location.href = 'dashboard.html';
-});
+// ---- Google redirect flow ----
+// Set a sessionStorage flag before the redirect so we know on return that
+// we should call getRedirectResult instead of letting onAuthStateChanged act.
+const googleRedirectPending = Boolean(sessionStorage.getItem('googleRedirect'));
+sessionStorage.removeItem('googleRedirect');
+
+function listenForSignIn() {
+  onAuthStateChanged(auth, (user) => {
+    if (user) window.location.href = 'dashboard.html';
+  });
+}
+
+if (googleRedirectPending) {
+  getRedirectResult(auth)
+    .then(async (result) => {
+      if (result) {
+        // First-time Google sign-in — create Firestore profile if needed.
+        const userRef  = doc(db, 'users', result.user.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            email:       result.user.email,
+            displayName: result.user.displayName || result.user.email,
+            role:        'user',
+            status:      'pending',
+            createdAt:   serverTimestamp(),
+          });
+        }
+        window.location.href = 'dashboard.html';
+      } else {
+        // Result already consumed (e.g. page was refreshed) — fall back to
+        // onAuthStateChanged which will redirect if the user is still signed in.
+        listenForSignIn();
+      }
+    })
+    .catch((err) => {
+      if (err.code !== 'auth/user-cancelled') {
+        showError('loginError', friendlyError(err.code));
+      }
+      listenForSignIn();
+    });
+} else {
+  listenForSignIn();
+}
 
 // ---- Google Sign-In ----
-async function handleGoogleSignIn() {
-  try {
-    const result   = await signInWithPopup(auth, new GoogleAuthProvider());
-    const userRef  = doc(db, 'users', result.user.uid);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) {
-      await setDoc(userRef, {
-        email:       result.user.email,
-        displayName: result.user.displayName || result.user.email,
-        role:        'user',
-        status:      'pending',
-        createdAt:   serverTimestamp(),
-      });
-    }
-    window.location.href = 'dashboard.html';
-  } catch (err) {
-    if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-      showError('loginError', friendlyError(err.code));
-    }
-  }
+function handleGoogleSignIn() {
+  sessionStorage.setItem('googleRedirect', '1');
+  signInWithRedirect(auth, new GoogleAuthProvider());
 }
 
 document.getElementById('googleLoginBtn').addEventListener('click',  handleGoogleSignIn);
