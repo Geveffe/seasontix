@@ -62,40 +62,38 @@ function friendlyError(code) {
   }[code] || 'Something went wrong. Please try again.';
 }
 
-// ---- Init: resolve any pending redirect before setting up auth listener ----
-// Awaiting getRedirectResult first ensures the new-user Firestore profile is
-// written before onAuthStateChanged can redirect to the dashboard.
-async function init() {
-  try {
-    const result = await getRedirectResult(auth);
-    if (result) {
-      const userRef  = doc(db, 'users', result.user.uid);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          email:       result.user.email,
-          displayName: result.user.displayName || result.user.email,
-          role:        'user',
-          status:      'pending',
-          createdAt:   serverTimestamp(),
-        });
-      }
-      window.location.href = 'dashboard.html';
-      return;
+// ---- Auth redirect coordination ----
+// getRedirectResult is kicked off immediately and stored as a promise so the
+// onAuthStateChanged listener can await it before deciding to redirect. This
+// ensures that (a) the listener is always registered (so email/password login
+// redirects work), and (b) a new Google user's Firestore profile is written
+// before any redirect fires.
+const redirectCheck = getRedirectResult(auth)
+  .then(async (result) => {
+    if (!result) return;
+    const userRef  = doc(db, 'users', result.user.uid);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        email:       result.user.email,
+        displayName: result.user.displayName || result.user.email,
+        role:        'user',
+        status:      'pending',
+        createdAt:   serverTimestamp(),
+      });
     }
-  } catch (err) {
+    window.location.href = 'dashboard.html';
+  })
+  .catch((err) => {
     if (err.code !== 'auth/user-cancelled') {
       showError('loginError', friendlyError(err.code));
     }
-  }
-
-  // No redirect in progress — redirect already-logged-in users immediately.
-  onAuthStateChanged(auth, (user) => {
-    if (user) window.location.href = 'dashboard.html';
   });
-}
 
-init();
+onAuthStateChanged(auth, async (user) => {
+  await redirectCheck; // let the Google redirect flow finish first if in progress
+  if (user) window.location.href = 'dashboard.html';
+});
 
 // ---- Google Sign-In ----
 function handleGoogleSignIn() {
