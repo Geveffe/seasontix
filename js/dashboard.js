@@ -306,32 +306,46 @@ function setupCodeRedemption(user) {
 
     try {
       const codeRef = doc(db, 'inviteCodes', code);
+      console.log('[redeem] starting — uid:', user.uid, 'code:', code);
 
       // Step 1: Claim the invite code atomically. Single-document transaction
       // so two simultaneous attempts on the same code produce a clear error.
-      await runTransaction(db, async (tx) => {
-        const codeSnap = await tx.get(codeRef);
-        if (!codeSnap.exists()) throw new Error('Invalid code — please check and try again.');
-        const codeData = codeSnap.data();
-        if (codeData.used && codeData.usedBy !== user.uid) {
-          throw new Error('This code has already been used.');
-        }
-        if (!codeData.used) {
-          tx.update(codeRef, {
-            used: true,
-            usedBy: user.uid,
-            usedByEmail: user.email,
-            usedAt: serverTimestamp(),
-          });
-        }
-      });
+      try {
+        await runTransaction(db, async (tx) => {
+          const codeSnap = await tx.get(codeRef);
+          if (!codeSnap.exists()) throw new Error('Invalid code — please check and try again.');
+          const codeData = codeSnap.data();
+          console.log('[redeem] code state:', { used: codeData.used, usedBy: codeData.usedBy });
+          if (codeData.used && codeData.usedBy !== user.uid) {
+            throw new Error('This code has already been used.');
+          }
+          if (!codeData.used) {
+            tx.update(codeRef, {
+              used: true,
+              usedBy: user.uid,
+              usedByEmail: user.email,
+              usedAt: serverTimestamp(),
+            });
+          }
+        });
+        console.log('[redeem] step 1 complete');
+      } catch (err) {
+        console.error('[redeem] step 1 (claim code) failed:', err.code, err.message);
+        throw err;
+      }
 
       // Step 2: Approve the user. The security rule verifies the code is now
       // claimed by this user, so this can be a plain update.
-      await updateDoc(doc(db, 'users', user.uid), {
-        status: 'approved',
-        usedInviteCode: code,
-      });
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          status: 'approved',
+          usedInviteCode: code,
+        });
+        console.log('[redeem] step 2 complete');
+      } catch (err) {
+        console.error('[redeem] step 2 (approve user) failed:', err.code, err.message);
+        throw err;
+      }
 
       showToast('Code accepted! Welcome to Season Tix.', 'success');
       window.location.reload();
