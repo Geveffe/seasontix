@@ -59,10 +59,7 @@ service cloud.firestore {
              request.resource.data.status == 'approved' &&
              ('usedInviteCode' in request.resource.data) &&
              exists(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)) &&
-             (
-               !get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)).data.used ||
-               get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)).data.usedBy == request.auth.uid
-             )
+             get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)).data.usedBy == request.auth.uid
            )
          )
         );
@@ -77,12 +74,10 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isAdmin();
       // Any authenticated user can claim an unused code by marking it as used with their uid.
-      // They may not modify the original code/createdAt/createdBy fields.
       allow update: if isAuth() &&
         resource.data.used == false &&
         request.resource.data.used == true &&
-        request.resource.data.usedBy == request.auth.uid &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt', 'createdBy']);
+        request.resource.data.usedBy == request.auth.uid;
       allow delete: if isAdmin();
     }
 

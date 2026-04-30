@@ -3,7 +3,7 @@
 import { auth, db } from './firebase-config.js';
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, doc, getDoc, query, where, orderBy,
+  collection, doc, getDoc, updateDoc, query, where, orderBy,
   runTransaction, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
@@ -305,19 +305,17 @@ function setupCodeRedemption(user) {
     btn.textContent = 'Redeeming…';
 
     try {
+      const codeRef = doc(db, 'inviteCodes', code);
+
+      // Step 1: Claim the invite code atomically. Single-document transaction
+      // so two simultaneous attempts on the same code produce a clear error.
       await runTransaction(db, async (tx) => {
-        const codeRef  = doc(db, 'inviteCodes', code);
         const codeSnap = await tx.get(codeRef);
-
         if (!codeSnap.exists()) throw new Error('Invalid code — please check and try again.');
-
         const codeData = codeSnap.data();
         if (codeData.used && codeData.usedBy !== user.uid) {
           throw new Error('This code has already been used.');
         }
-
-        // Mark code as used within the same transaction as the user approval.
-        // Skip if we already claimed it on a prior attempt.
         if (!codeData.used) {
           tx.update(codeRef, {
             used: true,
@@ -326,11 +324,13 @@ function setupCodeRedemption(user) {
             usedAt: serverTimestamp(),
           });
         }
+      });
 
-        tx.update(doc(db, 'users', user.uid), {
-          status: 'approved',
-          usedInviteCode: code,
-        });
+      // Step 2: Approve the user. The security rule verifies the code is now
+      // claimed by this user, so this can be a plain update.
+      await updateDoc(doc(db, 'users', user.uid), {
+        status: 'approved',
+        usedInviteCode: code,
       });
 
       showToast('Code accepted! Welcome to Season Tix.', 'success');
