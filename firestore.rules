@@ -46,9 +46,8 @@ service cloud.firestore {
 
       // Users can update their own profile but cannot change their role.
       // Status can only change from pending→approved when a valid invite code
-      // is referenced in usedInviteCode. The code must either be currently
-      // unused (being claimed atomically) or already claimed by this user
-      // (retry case). Admins can update any profile field.
+      // exists in the inviteCodes collection. Single-use enforcement is handled
+      // by the inviteCodes update rule. Admins can update any profile field.
       allow update: if isAdmin() ||
         (isAuth() && request.auth.uid == userId &&
          request.resource.data.role == resource.data.role &&
@@ -58,8 +57,7 @@ service cloud.firestore {
              resource.data.status == 'pending' &&
              request.resource.data.status == 'approved' &&
              ('usedInviteCode' in request.resource.data) &&
-             exists(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)) &&
-             get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode)).data.usedBy == request.auth.uid
+             exists(/databases/$(database)/documents/inviteCodes/$(request.resource.data.usedInviteCode))
            )
          )
         );
