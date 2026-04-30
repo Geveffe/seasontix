@@ -334,9 +334,10 @@ function setupCodeRedemption(user) {
         throw err;
       }
 
-      // Step 2: Approve the user. The security rule verifies the code is now
-      // claimed by this user, so this can be a plain update.
+      // Step 2: Approve the user.
       try {
+        const preSnap = await getDoc(doc(db, 'users', user.uid));
+        console.log('[redeem] user doc exists:', preSnap.exists(), 'data:', JSON.stringify(preSnap.data()));
         await updateDoc(doc(db, 'users', user.uid), {
           status: 'approved',
           usedInviteCode: code,
