@@ -2,7 +2,7 @@
 
 import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { doc, getDoc }        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // ---- Auth guards ------------------------------------------------
 
@@ -11,7 +11,19 @@ export function requireAuth(callback) {
   const unsub = onAuthStateChanged(auth, async (user) => {
     unsub();
     if (!user) { window.location.href = 'index.html'; return; }
-    const profile = await getUserProfile(user.uid);
+    let profile = await getUserProfile(user.uid);
+    if (!profile) {
+      // Profile missing — create it now. Handles the case where ensureProfile
+      // was skipped (e.g. Google redirect result already consumed on a prior load).
+      await setDoc(doc(db, 'users', user.uid), {
+        email:       user.email,
+        displayName: user.displayName || user.email,
+        role:        'user',
+        status:      'pending',
+        createdAt:   serverTimestamp(),
+      });
+      profile = await getUserProfile(user.uid);
+    }
     callback(user, profile);
   });
 }

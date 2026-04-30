@@ -93,13 +93,25 @@ if (googleRedirectPending) {
         window.location.href = 'dashboard.html';
       } else {
         // Result already consumed or redirect didn't complete — check auth state.
-        onAuthStateChanged(auth, (user) => { if (user) window.location.href = 'dashboard.html'; });
+        // Still call ensureProfile in case this is a first-time Google user whose
+        // profile was never created (e.g. result was consumed on a prior page load).
+        onAuthStateChanged(auth, async (user) => {
+          if (user) {
+            await ensureProfile(user);
+            window.location.href = 'dashboard.html';
+          }
+        });
       }
     })
     .catch((err) => {
       // Show the real error code so we can diagnose domain/config issues.
       showError('loginError', friendlyError(err.code));
-      onAuthStateChanged(auth, (user) => { if (user) window.location.href = 'dashboard.html'; });
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          await ensureProfile(user);
+          window.location.href = 'dashboard.html';
+        }
+      });
     });
 } else {
   // Normal page load — redirect already-signed-in users.

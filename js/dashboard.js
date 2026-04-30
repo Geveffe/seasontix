@@ -3,7 +3,7 @@
 import { auth, db } from './firebase-config.js';
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  collection, doc, getDoc, updateDoc, query, where, orderBy,
+  collection, doc, getDoc, setDoc, updateDoc, query, where, orderBy,
   runTransaction, onSnapshot, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
@@ -306,43 +306,43 @@ function setupCodeRedemption(user) {
 
     try {
       const codeRef = doc(db, 'inviteCodes', code);
-      console.log('[redeem] starting — uid:', user.uid, 'code:', code);
 
       // Step 1: Claim the invite code atomically. Single-document transaction
       // so two simultaneous attempts on the same code produce a clear error.
-      try {
-        await runTransaction(db, async (tx) => {
-          const codeSnap = await tx.get(codeRef);
-          if (!codeSnap.exists()) throw new Error('Invalid code — please check and try again.');
-          const codeData = codeSnap.data();
-          console.log('[redeem] code state:', { used: codeData.used, usedBy: codeData.usedBy });
-          if (codeData.used && codeData.usedBy !== user.uid) {
-            throw new Error('This code has already been used.');
-          }
-          if (!codeData.used) {
-            tx.update(codeRef, {
-              used: true,
-              usedBy: user.uid,
-              usedByEmail: user.email,
-              usedAt: serverTimestamp(),
-            });
-          }
-        });
-        console.log('[redeem] step 1 complete');
-      } catch (err) {
-        console.error('[redeem] step 1 (claim code) failed:', err.code, err.message);
-        throw err;
-      }
+      await runTransaction(db, async (tx) => {
+        const codeSnap = await tx.get(codeRef);
+        if (!codeSnap.exists()) throw new Error('Invalid code — please check and try again.');
+        const codeData = codeSnap.data();
+        if (codeData.used && codeData.usedBy !== user.uid) {
+          throw new Error('This code has already been used.');
+        }
+        if (!codeData.used) {
+          tx.update(codeRef, {
+            used: true,
+            usedBy: user.uid,
+            usedByEmail: user.email,
+            usedAt: serverTimestamp(),
+          });
+        }
+      });
 
-      // Step 2: Approve the user.
+      // Step 2: Approve the user. Use setDoc+merge so that if the profile doc
+      // was never created (broken redirect flow) it gets created here too.
       try {
-        const preSnap = await getDoc(doc(db, 'users', user.uid));
-        console.log('[redeem] user doc exists:', preSnap.exists(), 'data:', JSON.stringify(preSnap.data()));
-        await updateDoc(doc(db, 'users', user.uid), {
-          status: 'approved',
-          usedInviteCode: code,
-        });
-        console.log('[redeem] step 2 complete');
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          await updateDoc(userRef, { status: 'approved', usedInviteCode: code });
+        } else {
+          await setDoc(userRef, {
+            email:          user.email,
+            displayName:    user.displayName || user.email,
+            role:           'user',
+            status:         'approved',
+            usedInviteCode: code,
+            createdAt:      serverTimestamp(),
+          });
+        }
       } catch (err) {
         console.error('[redeem] step 2 (approve user) failed:', err.code, err.message);
         throw err;
