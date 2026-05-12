@@ -213,11 +213,20 @@ window.openClaimModal = function(eventId) {
   container.innerHTML = Object.entries(TICKET_SETS).map(([key, label]) => {
     const avail = ev.ticketSets?.[key]?.available;
     if (!avail) return '';   // don't show already-taken sets
+    const price = ev.ticketSets?.[key]?.price;
+    const count = TICKET_SET_COUNTS[key] ?? 0;
+    const ticketWord = count === 1 ? 'ticket' : 'tickets';
+    const subline = price != null
+      ? `${count} ${ticketWord} · $${Number(price).toFixed(2)}`
+      : `${count} ${ticketWord}`;
     return `
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:2px solid var(--border);border-radius:var(--radius-sm);transition:var(--transition)"
              onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor=this.querySelector('input').checked?'var(--primary)':'var(--border)'">
-        <input type="checkbox" id="claimSet_${key}" value="${key}" style="width:16px;height:16px;cursor:pointer">
-        <span style="font-size:14px">${escapeHtml(label)}</span>
+        <input type="checkbox" id="claimSet_${key}" value="${key}" style="width:16px;height:16px;flex-shrink:0;cursor:pointer">
+        <div>
+          <div style="font-size:14px;font-weight:500">${escapeHtml(label)}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${subline}</div>
+        </div>
       </label>`;
   }).join('');
 
