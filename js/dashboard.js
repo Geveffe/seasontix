@@ -8,7 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
   requireAuth, formatDate, formatDateShort,
-  showToast, showConfirm, escapeHtml, TICKET_SETS,
+  showToast, showConfirm, escapeHtml, TICKET_SETS, TICKET_SET_COUNTS,
 } from './common.js';
 
 let currentUser    = null;
@@ -102,14 +102,18 @@ function buildEventCard(ev) {
   const setsHtml = Object.entries(TICKET_SETS).map(([key, label]) => {
     const avail = ev.ticketSets?.[key]?.available;
     const price = ev.ticketSets?.[key]?.price;
-    const priceStr = price != null ? `<span style="font-size:12px;color:var(--text-muted);margin-right:6px">$${Number(price).toFixed(2)}</span>` : '';
+    const count = TICKET_SET_COUNTS[key] ?? 0;
+    const ticketWord = count === 1 ? 'ticket' : 'tickets';
+    const subline = price != null
+      ? `${count} ${ticketWord} · $${Number(price).toFixed(2)}`
+      : `${count} ${ticketWord}`;
     return `
-      <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
-        <span>${escapeHtml(label)}</span>
-        <div style="display:flex;align-items:center;flex-shrink:0">
-          ${priceStr}
-          <span class="badge ${avail ? 'badge-available' : 'badge-full'}">${avail ? 'Open' : 'Taken'}</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:500;line-height:1.3">${escapeHtml(label)}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${subline}</div>
         </div>
+        <span class="badge ${avail ? 'badge-available' : 'badge-full'}" style="flex-shrink:0">${avail ? 'Open' : 'Taken'}</span>
       </div>`;
   }).join('');
 

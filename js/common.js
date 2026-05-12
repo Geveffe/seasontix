@@ -131,3 +131,9 @@ export const TICKET_SETS = {
   s149bb1213: 'Sec 149 · Row BB · Seats 12–13',
   s149bb1415: 'Sec 149 · Row BB · Seats 14–15',
 };
+
+export const TICKET_SET_COUNTS = {
+  s130m57:    3,
+  s149bb1213: 2,
+  s149bb1415: 2,
+};
