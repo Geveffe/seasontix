@@ -25,6 +25,8 @@ requireAuth(async (user, profile) => {
   document.getElementById('userInitial').textContent = (profile?.displayName || user.email)[0].toUpperCase();
   if (profile?.role === 'admin') {
     document.getElementById('adminLink').classList.remove('hidden');
+  } else {
+    document.querySelector('.header-nav').classList.add('hidden');
   }
 
   document.getElementById('logoutBtn').addEventListener('click', async () => {
