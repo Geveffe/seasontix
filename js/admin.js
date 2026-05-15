@@ -201,16 +201,20 @@ window.submitEvent = async function() {
       updatedAt: serverTimestamp(),
     };
 
+    console.log('[submitEvent] writing data, date =', dateTimestamp?.toDate?.()?.toString() ?? 'null');
     if (editingEventId) {
       await updateDoc(doc(db, 'events', editingEventId), data);
+      console.log('[submitEvent] updateDoc succeeded');
       showToast('Event updated.', 'success');
     } else {
       data.createdAt = serverTimestamp();
       await addDoc(collection(db, 'events'), data);
+      console.log('[submitEvent] addDoc succeeded');
       showToast('Event added.', 'success');
     }
     window.closeEventModal();
   } catch (err) {
+    console.error('[submitEvent] save failed:', err);
     errEl.textContent = err.message || 'Failed to save event.';
     errEl.classList.remove('hidden');
   } finally {
