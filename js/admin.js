@@ -74,6 +74,7 @@ function loadStats() {
 
 // ---- Events Tab -------------------------------------------------
 let _eventsUnsub = null;
+const _eventDates = {}; // eventId → date seconds, used for sorting claims
 
 function loadEvents() {
   const tbody = document.getElementById('eventsBody');
@@ -81,6 +82,7 @@ function loadEvents() {
 
   const q = query(collection(db, 'events'), orderBy('date', 'asc'));
   _eventsUnsub = onSnapshot(q, (snap) => {
+    snap.docs.forEach(d => { _eventDates[d.id] = d.data().date?.seconds || 0; });
     if (snap.empty) {
       tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-muted)">No events yet. Add one!</td></tr>';
       return;
@@ -340,7 +342,7 @@ function loadClaims() {
     }
     const claims = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (b.claimedAt?.seconds || 0) - (a.claimedAt?.seconds || 0));
+      .sort((a, b) => (_eventDates[a.eventId] || 0) - (_eventDates[b.eventId] || 0));
 
     tbody.innerHTML = '';
     claims.forEach(c => tbody.appendChild(buildClaimRow(c)));

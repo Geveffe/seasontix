@@ -162,7 +162,7 @@ function loadMyClaims() {
       }
       return claim;
     }));
-    claims.sort((a, b) => (b.claimedAt?.seconds || 0) - (a.claimedAt?.seconds || 0));
+    claims.sort((a, b) => (a.event?.date?.seconds || 0) - (b.event?.date?.seconds || 0));
 
     container.innerHTML = '';
     const list = document.createElement('div');
