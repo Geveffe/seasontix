@@ -191,7 +191,13 @@ window.submitEvent = async function() {
       const d = new Date(year, month - 1, day, hours, minutes);
       console.log('[submitEvent] parsed date:', d.toString());
       if (isNaN(d.getTime())) throw new Error('Invalid date/time — please re-enter.');
-      dateTimestamp = Timestamp.fromDate(d);
+      try {
+        dateTimestamp = Timestamp.fromDate(d);
+        console.log('[submitEvent] Timestamp created:', dateTimestamp);
+      } catch (tsErr) {
+        console.log('[submitEvent] Timestamp.fromDate FAILED:', tsErr.message, tsErr);
+        throw tsErr;
+      }
     }
 
     const data = {
@@ -214,7 +220,7 @@ window.submitEvent = async function() {
     }
     window.closeEventModal();
   } catch (err) {
-    console.error('[submitEvent] save failed:', err);
+    console.log('[submitEvent] save failed:', err.message, err);
     errEl.textContent = err.message || 'Failed to save event.';
     errEl.classList.remove('hidden');
   } finally {
