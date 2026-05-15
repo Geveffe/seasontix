@@ -179,14 +179,24 @@ window.submitEvent = async function() {
   btn.disabled = true;
   btn.textContent = 'Saving…';
 
-  const data = {
-    title,
-    date:      dateStr ? Timestamp.fromDate(new Date(dateStr)) : null,
-    ticketSets,
-    updatedAt: serverTimestamp(),
-  };
-
   try {
+    let dateTimestamp = null;
+    if (dateStr) {
+      const [datePart, timePart = '00:00'] = dateStr.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hours, minutes]   = timePart.split(':').map(Number);
+      const d = new Date(year, month - 1, day, hours, minutes);
+      if (isNaN(d.getTime())) throw new Error('Invalid date/time — please re-enter.');
+      dateTimestamp = Timestamp.fromDate(d);
+    }
+
+    const data = {
+      title,
+      date:      dateTimestamp,
+      ticketSets,
+      updatedAt: serverTimestamp(),
+    };
+
     if (editingEventId) {
       await updateDoc(doc(db, 'events', editingEventId), data);
       showToast('Event updated.', 'success');
