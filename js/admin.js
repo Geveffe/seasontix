@@ -183,11 +183,13 @@ window.submitEvent = async function() {
 
   try {
     let dateTimestamp = null;
+    console.log('[submitEvent] dateStr from input:', JSON.stringify(dateStr));
     if (dateStr) {
       const [datePart, timePart = '00:00'] = dateStr.split('T');
       const [year, month, day] = datePart.split('-').map(Number);
       const [hours, minutes]   = timePart.split(':').map(Number);
       const d = new Date(year, month - 1, day, hours, minutes);
+      console.log('[submitEvent] parsed date:', d.toString());
       if (isNaN(d.getTime())) throw new Error('Invalid date/time — please re-enter.');
       dateTimestamp = Timestamp.fromDate(d);
     }
