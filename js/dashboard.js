@@ -4,17 +4,19 @@ import { auth, db } from './firebase-config.js';
 import { signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
   collection, doc, getDoc, setDoc, updateDoc, query, where, orderBy,
-  runTransaction, onSnapshot, serverTimestamp,
+  runTransaction, onSnapshot, serverTimestamp, arrayUnion, arrayRemove,
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
   requireAuth, formatDate, formatDateShort,
   showToast, showConfirm, escapeHtml, TICKET_SETS, TICKET_SET_COUNTS,
 } from './common.js';
 
-let currentUser    = null;
-let currentProfile = null;
-let selectedEvent  = null;
-const eventsCache  = {};
+let currentUser      = null;
+let currentProfile   = null;
+let selectedEvent    = null;
+const eventsCache    = {};
+let allUpcomingEvents = [];
+let hiddenEvents      = new Set();
 
 requireAuth(async (user, profile) => {
   currentUser    = user;
@@ -46,6 +48,7 @@ requireAuth(async (user, profile) => {
   setupTabs();
   loadEvents();
   loadMyClaims();
+  subscribeHiddenEvents();
 });
 
 // ---- Tabs -------------------------------------------------------
@@ -62,37 +65,69 @@ function setupTabs() {
 
 // ---- Events -----------------------------------------------------
 function loadEvents() {
-  const container = document.getElementById('eventsContainer');
-  container.innerHTML = '<div class="loading"><div class="spinner"></div> Loading games…</div>';
+  document.getElementById('eventsContainer').innerHTML =
+    '<div class="loading"><div class="spinner"></div> Loading games…</div>';
 
   const q = query(collection(db, 'events'), orderBy('date', 'asc'));
 
   onSnapshot(q, (snap) => {
-    const now    = new Date();
-    // Keep cache in sync
+    const now = new Date();
     snap.docs.forEach(d => { eventsCache[d.id] = { id: d.id, ...d.data() }; });
-
-    const events = snap.docs
+    allUpcomingEvents = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
       .filter(e => !e.date || e.date.toDate() >= now);
-
-    if (events.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">🎟️</div>
-          <p>No upcoming games yet — check back soon!</p>
-        </div>`;
-      return;
-    }
-
-    container.innerHTML = '';
-    const grid = document.createElement('div');
-    grid.className = 'events-grid';
-    events.forEach(ev => grid.appendChild(buildEventCard(ev)));
-    container.appendChild(grid);
+    renderAvailableEvents();
+    renderHiddenEvents();
   }, (err) => {
-    container.innerHTML = `<div class="empty-state"><p>Error loading games: ${escapeHtml(err.message)}</p></div>`;
+    document.getElementById('eventsContainer').innerHTML =
+      `<div class="empty-state"><p>Error loading games: ${escapeHtml(err.message)}</p></div>`;
   });
+}
+
+function renderAvailableEvents() {
+  const container = document.getElementById('eventsContainer');
+  const visible = allUpcomingEvents.filter(e => !hiddenEvents.has(e.id));
+
+  if (visible.length === 0) {
+    const someHidden = allUpcomingEvents.some(e => hiddenEvents.has(e.id));
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🎟️</div>
+        <p>${someHidden
+          ? 'All upcoming games are hidden. Check the Hidden tab to restore them.'
+          : 'No upcoming games yet — check back soon!'}</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'events-grid';
+  visible.forEach(ev => grid.appendChild(buildEventCard(ev)));
+  container.appendChild(grid);
+}
+
+function renderHiddenEvents() {
+  const container = document.getElementById('hiddenContainer');
+  const hidden = allUpcomingEvents.filter(e => hiddenEvents.has(e.id));
+
+  const tabBtn = document.getElementById('hiddenTabBtn');
+  if (tabBtn) tabBtn.textContent = hidden.length > 0 ? `Hidden (${hidden.length})` : 'Hidden';
+
+  if (hidden.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">👁️</div>
+        <p>No hidden games. Use the Hide button on any game you can't make it to.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'events-grid';
+  hidden.forEach(ev => grid.appendChild(buildHiddenCard(ev)));
+  container.appendChild(grid);
 }
 
 function buildEventCard(ev) {
@@ -127,14 +162,64 @@ function buildEventCard(ev) {
     <div class="event-card-body">
       <div style="display:flex;flex-direction:column;gap:8px">${setsHtml}</div>
     </div>
-    <div class="event-card-footer">
+    <div class="event-card-footer" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
       <button class="btn btn-primary" ${anyAvail ? '' : 'disabled'}
         onclick="openClaimModal('${escapeHtml(ev.id)}')">
         ${anyAvail ? 'Claim Tickets' : 'All Sets Taken'}
       </button>
+      <button class="btn btn-ghost btn-sm" onclick="hideEvent('${escapeHtml(ev.id)}')" title="Hide this game">
+        Hide
+      </button>
     </div>`;
   return card;
 }
+
+function buildHiddenCard(ev) {
+  const card = document.createElement('div');
+  card.className = 'event-card';
+  card.innerHTML = `
+    <div class="event-card-header">
+      <div class="event-date">${formatDate(ev.date)}</div>
+      <div class="event-title">Seahawks vs. ${escapeHtml(ev.title)}</div>
+    </div>
+    <div class="event-card-footer">
+      <button class="btn btn-ghost btn-sm" onclick="unhideEvent('${escapeHtml(ev.id)}')">
+        Unhide
+      </button>
+    </div>`;
+  return card;
+}
+
+// ---- Hide / Unhide ----------------------------------------------
+function subscribeHiddenEvents() {
+  const userRef = doc(db, 'users', currentUser.uid);
+  onSnapshot(userRef, (snap) => {
+    const data = snap.data() || {};
+    hiddenEvents = new Set(data.hiddenEvents || []);
+    renderAvailableEvents();
+    renderHiddenEvents();
+  });
+}
+
+window.hideEvent = async function(eventId) {
+  try {
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      hiddenEvents: arrayUnion(eventId),
+    });
+  } catch (err) {
+    showToast('Failed to hide game.', 'error');
+  }
+};
+
+window.unhideEvent = async function(eventId) {
+  try {
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      hiddenEvents: arrayRemove(eventId),
+    });
+  } catch (err) {
+    showToast('Failed to unhide game.', 'error');
+  }
+};
 
 // ---- My Claims --------------------------------------------------
 function loadMyClaims() {

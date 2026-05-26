@@ -65,6 +65,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-panel="panelGames">Available Games</button>
       <button class="tab-btn"        data-panel="panelMyClaims">My Claims</button>
+      <button class="tab-btn"        data-panel="panelHidden" id="hiddenTabBtn">Hidden</button>
     </div>
 
     <!-- Available Games -->
@@ -77,6 +78,13 @@
     <!-- My Claims -->
     <div id="panelMyClaims" class="tab-panel">
       <div id="claimsContainer">
+        <div class="loading"><div class="spinner"></div> Loading…</div>
+      </div>
+    </div>
+
+    <!-- Hidden Games -->
+    <div id="panelHidden" class="tab-panel">
+      <div id="hiddenContainer">
         <div class="loading"><div class="spinner"></div> Loading…</div>
       </div>
     </div>
